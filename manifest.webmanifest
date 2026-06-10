@@ -1,0 +1,16 @@
+{
+  "name": "Zenitas — astronominių stebėjimų planuoklis",
+  "short_name": "Zenitas",
+  "description": "Stebėjimo sąlygų kalendorius, astro orai, žvaigždėlapis, DSO katalogas ir stebėjimų žurnalas mėgėjams astronomams.",
+  "lang": "lt",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070B16",
+  "theme_color": "#070B16",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

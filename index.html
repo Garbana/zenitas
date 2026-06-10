@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070B16">
+<title>Zenitas — stebėjimų planavimas ir žurnalas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070B16; --panel:#0E1525; --panel2:#16203A; --line:#22304F; --line2:#2E3F66;
+  --ink:#E9EDF8; --mut:#94A1C3; --dim:#5F6C8E;
+  --gold:#F2C879; --acc:#8FB8E8; --good:#63C98B; --warn:#E5B45C; --poor:#E08A52; --bad:#DB6470;
+  --r:14px;
+  font-size:16px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif; min-height:100%;}
+html.red{filter:grayscale(1) sepia(1) hue-rotate(-50deg) saturate(5) brightness(.8);}
+h1,h2,h3,.disp{font-family:'Space Grotesk','IBM Plex Sans',sans-serif; letter-spacing:.01em;}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:1rem;color:var(--ink);background:var(--panel2);
+  border:1px solid var(--line2);border-radius:10px;padding:.55rem .7rem;width:100%;}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+label{font-size:.8rem;color:var(--mut);display:block;margin:.6rem 0 .25rem}
+a{color:var(--acc)}
+
+#app{max-width:760px;margin:0 auto;padding:0 .9rem 5.5rem;}
+header.top{display:flex;align-items:center;gap:.6rem;padding:.8rem 0 .5rem;position:sticky;top:0;
+  background:linear-gradient(var(--bg) 78%,transparent);z-index:30;}
+header.top h1{font-size:1.25rem;margin:0;font-weight:700;}
+header.top h1 span{color:var(--gold)}
+.loc-chip{margin-left:auto;display:flex;align-items:center;gap:.35rem;background:var(--panel);
+  border:1px solid var(--line);border-radius:999px;padding:.35rem .7rem;font-size:.8rem;color:var(--mut);max-width:46%;}
+.loc-chip b{color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+  display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex:none}
+.iconbtn.on{border-color:var(--bad);color:var(--bad)}
+
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(10,15,28,.96);
+  border-top:1px solid var(--line);backdrop-filter:blur(8px);
+  padding:.3rem max(.4rem,env(safe-area-inset-left)) max(.45rem,env(safe-area-inset-bottom));}
+nav.tabs .row{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);}
+nav.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:.35rem 0;
+  font-size:.66rem;color:var(--dim);border-radius:10px;}
+nav.tabs button .i{font-size:1.15rem;line-height:1}
+nav.tabs button.act{color:var(--gold)}
+
+.view{display:none;animation:fade .18s ease}
+.view.act{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.view.act{animation:none}}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:.9rem;margin:.7rem 0;}
+.card h2{font-size:.95rem;margin:0 0 .6rem;display:flex;align-items:center;gap:.45rem;}
+.card h2 .sub{margin-left:auto;font-size:.72rem;color:var(--dim);font-weight:400;font-family:'IBM Plex Sans'}
+.eyebrow{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0 0 .2rem}
+.muted{color:var(--mut);font-size:.85rem}
+.small{font-size:.78rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem}
+.stat{background:var(--panel2);border-radius:10px;padding:.5rem .6rem}
+.stat .v{font-size:1.05rem;font-weight:600;font-family:'Space Grotesk'}
+.stat .k{font-size:.68rem;color:var(--mut);margin-top:.1rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;background:var(--panel2);
+  border:1px solid var(--line2);border-radius:10px;padding:.55rem .9rem;font-size:.88rem;font-weight:500}
+.btn.primary{background:var(--gold);color:#1A1404;border-color:var(--gold);font-weight:600}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn.sm{padding:.3rem .6rem;font-size:.76rem;border-radius:8px}
+.btn:disabled{opacity:.45;cursor:default}
+.btnrow{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+
+.badge{display:inline-block;font-size:.66rem;font-weight:600;border-radius:6px;padding:.12rem .42rem;letter-spacing:.02em}
+.b-ideal{background:rgba(99,201,139,.16);color:var(--good)}
+.b-part{background:rgba(229,180,92,.16);color:var(--warn)}
+.b-poor{background:rgba(224,138,82,.16);color:var(--poor)}
+.b-bad{background:rgba(219,100,112,.16);color:var(--bad)}
+.b-none{background:rgba(148,161,195,.14);color:var(--mut)}
+.b-gold{background:rgba(242,200,121,.18);color:var(--gold)}
+.b-acc{background:rgba(143,184,232,.16);color:var(--acc)}
+
+/* Calendar */
+.cal-head{display:flex;align-items:center;gap:.6rem;margin:.4rem 0}
+.cal-head h2{margin:0;font-size:1rem}
+.legend{display:flex;gap:.8rem;flex-wrap:wrap;font-size:.7rem;color:var(--mut);margin:.4rem 0 .6rem}
+.legend i{display:inline-block;width:.7rem;height:.7rem;border-radius:3px;margin-right:.3rem;vertical-align:-1px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .dow{text-align:center;font-size:.62rem;color:var(--dim);padding:.2rem 0}
+.cal .day{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:.3rem .25rem .35rem;
+  min-height:58px;display:flex;flex-direction:column;gap:3px;cursor:pointer;position:relative}
+.cal .day.out{opacity:.32}
+.cal .day.today{border-color:var(--gold)}
+.cal .day .d{font-size:.72rem;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.cal .day .moon{font-size:.62rem;color:var(--mut)}
+.cal .day .qdot{width:7px;height:7px;border-radius:50%}
+.q-ideal{background:var(--good)} .q-part{background:var(--warn)} .q-poor{background:var(--poor)}
+.q-bad{background:var(--bad)} .q-none{background:var(--dim)}
+.nightbar{height:7px;border-radius:4px;background:#0A101F;position:relative;overflow:hidden;border:1px solid #1B2742}
+.nightbar .dark{position:absolute;top:0;bottom:0;background:#27406B}
+.nightbar .free{position:absolute;top:0;bottom:0;background:var(--good)}
+.nightbar .moonseg{position:absolute;top:0;bottom:0;background:rgba(229,180,92,.85)}
+
+/* lists */
+.obj-row{display:flex;gap:.7rem;align-items:center;padding:.6rem .2rem;border-bottom:1px solid var(--line);cursor:pointer}
+.obj-row:last-child{border-bottom:none}
+.obj-ico{width:38px;height:38px;border-radius:10px;background:var(--panel2);display:flex;align-items:center;
+  justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:.72rem;color:var(--acc);flex:none;text-align:center}
+.obj-main{flex:1;min-width:0}
+.obj-main .t{font-weight:600;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obj-main .s{font-size:.74rem;color:var(--mut);margin-top:1px}
+.obj-side{text-align:right;font-size:.74rem;color:var(--mut);flex:none}
+.stars{color:var(--gold);letter-spacing:.06em}
+
+.filters{display:flex;gap:.45rem;flex-wrap:wrap;margin:.5rem 0}
+.filters select,.filters input{width:auto;flex:1;min-width:104px;font-size:.82rem;padding:.4rem .5rem}
+.chips{display:flex;gap:.4rem;overflow-x:auto;padding-bottom:.2rem}
+.chip{flex:none;border:1px solid var(--line2);border-radius:999px;padding:.3rem .75rem;font-size:.78rem;color:var(--mut)}
+.chip.on{border-color:var(--gold);color:var(--gold)}
+
+/* sky chart */
+#skywrap{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);background:#04060D;touch-action:none}
+#sky{display:block;width:100%}
+#skyhud{position:absolute;left:.5rem;right:.5rem;bottom:.5rem;display:flex;gap:.4rem;align-items:center;
+  background:rgba(7,11,22,.82);border:1px solid var(--line);border-radius:10px;padding:.35rem .5rem}
+#skyhud input[type=range]{flex:1;accent-color:var(--gold);background:none;border:none;padding:0}
+#skytime{font-size:.74rem;color:var(--gold);font-family:'Space Grotesk';min-width:84px;text-align:center}
+#skymsg{position:absolute;top:.5rem;left:.5rem;right:.5rem;font-size:.74rem;color:var(--mut);
+  background:rgba(7,11,22,.8);border-radius:8px;padding:.3rem .5rem;display:none}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:60;display:none;align-items:flex-end;justify-content:center;
+  background:rgba(3,5,11,.66)}
+.modal.act{display:flex}
+.sheet{background:var(--panel);border:1px solid var(--line2);border-bottom:none;border-radius:18px 18px 0 0;
+  width:100%;max-width:760px;max-height:88vh;overflow-y:auto;padding:1rem 1rem 1.4rem;animation:up .2s ease}
+@keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sheet h2{margin:.1rem 0 .2rem;font-size:1.15rem}
+.sheet .x{position:sticky;top:0;float:right;font-size:1.2rem;color:var(--mut);padding:.2rem .5rem}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:.25rem .8rem;font-size:.84rem;margin:.6rem 0}
+.kv b{color:var(--mut);font-weight:500}
+.rate{display:flex;gap:.3rem;font-size:1.6rem}
+.rate button{color:var(--dim)} .rate button.on{color:var(--gold)}
+.photo-thumbs{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
+.photo-thumbs img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)}
+.toast{position:fixed;bottom:5.4rem;left:50%;transform:translateX(-50%);background:var(--panel2);
+  border:1px solid var(--line2);border-radius:10px;padding:.55rem .9rem;font-size:.84rem;z-index:80;
+  max-width:90%;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
+.session-banner{position:sticky;top:3.3rem;z-index:25;background:linear-gradient(135deg,#1A2742,#142036);
+  border:1px solid var(--line2);border-radius:12px;padding:.55rem .8rem;display:none;align-items:center;gap:.6rem;font-size:.82rem}
+.session-banner .pulse{width:9px;height:9px;border-radius:50%;background:var(--bad);animation:pl 1.6s infinite}
+.session-banner.act{display:flex}
+.inp{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;color:var(--ink);
+  padding:.55rem .7rem;font-size:.88rem;font-family:inherit;margin-top:.25rem}
+.inp:focus{outline:none;border-color:var(--gold)}
+#enStars span{font-size:1.7rem;cursor:pointer;padding:0 .12rem;user-select:none}
+@keyframes pl{50%{opacity:.3}}
+.hr{border:none;border-top:1px solid var(--line);margin:.8rem 0}
+.alertbox{border-left:3px solid var(--gold);background:var(--panel2);border-radius:0 10px 10px 0;
+  padding:.6rem .8rem;font-size:.85rem;margin:.6rem 0}
+.windows{display:flex;flex-direction:column;gap:.3rem;font-size:.82rem}
+.winrow{display:flex;align-items:center;gap:.5rem}
+.winrow .bar{flex:1}
+table.wx{width:100%;border-collapse:collapse;font-size:.76rem}
+table.wx th{color:var(--dim);font-weight:500;text-align:left;padding:.3rem .35rem;border-bottom:1px solid var(--line)}
+table.wx td{padding:.32rem .35rem;border-bottom:1px solid var(--line)}
+.cl{display:inline-block;width:2rem;text-align:center;border-radius:5px;padding:.08rem 0;font-weight:600}
+.empty{padding:1.4rem .6rem;text-align:center;color:var(--dim);font-size:.85rem}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <h1>Zen<span>·</span>itas</h1>
+    <div class="loc-chip" id="locChip" role="button" tabindex="0">📍 <b id="locName">Vilnius</b></div>
+    <button class="iconbtn" id="redBtn" title="Naktinis (raudonas) režimas">🔴</button>
+    <button class="iconbtn" id="setBtn" title="Nustatymai">⚙️</button>
+  </header>
+
+  <div class="session-banner" id="sessBanner">
+    <span class="pulse"></span>
+    <span id="sessInfo" style="flex:1">Vyksta stebėjimo sesija</span>
+    <button class="btn sm" id="sessGoto">Atidaryti</button>
+  </div>
+
+  <main>
+    <section class="view act" id="v-tonight"></section>
+    <section class="view" id="v-cal"></section>
+    <section class="view" id="v-sky">
+      <div id="skywrap">
+        <canvas id="sky"></canvas>
+        <div id="skymsg"></div>
+        <div id="skyhud">
+          <button class="btn sm" id="skyNow">Dabar</button>
+          <input type="range" id="skySlider" min="-720" max="720" step="10" value="0" aria-label="Laiko poslinkis">
+          <span id="skytime">—</span>
+        </div>
+      </div>
+      <p class="small muted" style="margin:.5rem .2rem">Vilkite — sukti, žnybkite / ratukas — mastelis, bakstelėkite objektą — informacija. Geltona linija — ekliptika.</p>
+    </section>
+    <section class="view" id="v-cat"></section>
+    <section class="view" id="v-log"></section>
+  </main>
+</div>
+
+<nav class="tabs"><div class="row">
+  <button data-v="v-tonight" class="act"><span class="i">✦</span>Šįvakar</button>
+  <button data-v="v-cal"><span class="i">▦</span>Kalendorius</button>
+  <button data-v="v-sky"><span class="i">⊕</span>Dangus</button>
+  <button data-v="v-cat"><span class="i">≡</span>Katalogas</button>
+  <button data-v="v-log"><span class="i">✎</span>Žurnalas</button>
+</div></nav>
+
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+/* ============ SAUGYKLA (window.storage -> localStorage -> atmintis) ============ */
+const Store=(()=>{
+  const mem={};
+  const hasWS=typeof window!=='undefined'&&window.storage&&window.storage.get;
+  let hasLS=false; try{localStorage.setItem('__t','1');localStorage.removeItem('__t');hasLS=true;}catch(e){}
+  return {
+    mode: hasWS?'cloud':(hasLS?'local':'mem'),
+    async get(k){ try{
+      if(hasWS){const r=await window.storage.get(k);return r?JSON.parse(r.value):null;}
+      if(hasLS){const v=localStorage.getItem('z:'+k);return v?JSON.parse(v):null;}
+      return mem[k]??null;
+    }catch(e){return null;} },
+    async set(k,v){ try{
+      const s=JSON.stringify(v);
+      if(hasWS){await window.storage.set(k,s);return true;}
+      if(hasLS){localStorage.setItem('z:'+k,s);return true;}
+      mem[k]=v;return true;
+    }catch(e){toast('Nepavyko išsaugoti (pilna saugykla?)');return false;} },
+    async del(k){ try{
+      if(hasWS){await window.storage.delete(k);}else if(hasLS){localStorage.removeItem('z:'+k);}else delete mem[k];
+    }catch(e){} },
+    async list(p){ try{
+      if(hasWS){const r=await window.storage.list(p);return r?r.keys:[];}
+      if(hasLS){const out=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);
+        if(k.startsWith('z:'+p))out.push(k.slice(2));}return out;}
+      return Object.keys(mem).filter(k=>k.startsWith(p));
+    }catch(e){return [];} }
+  };
+})();
+
+/* ============ ASTRONOMIJA ============ */
+const RAD=Math.PI/180, DEG=180/Math.PI, TAU=Math.PI*2, DAYMS=86400000;
+const toDays=date=>date.getTime()/DAYMS-0.5+2440588-2451545;
+const norm=a=>((a%TAU)+TAU)%TAU;
+function eclToEq(l,b){const e=RAD*23.4397;
+  return {ra:norm(Math.atan2(Math.sin(l)*Math.cos(e)-Math.tan(b)*Math.sin(e),Math.cos(l))),
+          dec:Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(l))};}
+function sunCoords(d){const M=RAD*(357.5291+0.98560028*d);
+  const C=RAD*(1.9148*Math.sin(M)+0.02*Math.sin(2*M)+0.0003*Math.sin(3*M));
+  const L=M+C+RAD*102.9372+Math.PI; return Object.assign(eclToEq(L,0),{L});}
+function moonCoords(d){const L=RAD*(218.316+13.176396*d),M=RAD*(134.963+13.064993*d),F=RAD*(93.272+13.229350*d);
+  const l=L+RAD*6.289*Math.sin(M), b=RAD*5.128*Math.sin(F), dist=385001-20905*Math.cos(M);
+  return Object.assign(eclToEq(l,b),{dist});}
+function sidereal(d,lon){return norm(RAD*(280.16+360.9856235*d)+lon*RAD);}
+function altazFromRaDec(ra,dec,date,lat,lon){
+  const d=toDays(date), H=sidereal(d,lon)-ra, phi=lat*RAD;
+  const alt=Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(H));
+  const az=norm(Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(phi)-Math.tan(dec)*Math.cos(phi))+Math.PI);
+  return {alt,az};}
+const sunAlt=(t,lat,lon)=>{const d=toDays(t),c=sunCoords(d);return altazFromRaDec(c.ra,c.dec,t,lat,lon).alt;};
+const moonAlt=(t,lat,lon)=>{const d=toDays(t),c=moonCoords(d);return altazFromRaDec(c.ra,c.dec,t,lat,lon).alt;};
+function moonIllum(date){const d=toDays(date),s=sunCoords(d),m=moonCoords(d),sd=149598000;
+  const phi=Math.acos(Math.sin(s.dec)*Math.sin(m.dec)+Math.cos(s.dec)*Math.cos(m.dec)*Math.cos(s.ra-m.ra));
+  const inc=Math.atan2(sd*Math.sin(phi),m.dist-sd*Math.cos(phi));
+  const ang=Math.atan2(Math.cos(s.dec)*Math.sin(s.ra-m.ra),
+    Math.sin(s.dec)*Math.cos(m.dec)-Math.cos(s.dec)*Math.sin(m.dec)*Math.cos(s.ra-m.ra));
+  return {fraction:(1+Math.cos(inc))/2, phase:0.5+0.5*inc*Math.sign(ang)/Math.PI};}
+function moonPhaseName(p){ // p 0..1, 0=jaunatis
+  if(p<0.0185||p>0.9815)return 'Jaunatis';
+  if(p<0.2315)return 'Augantis pjautuvas';
+  if(p<0.2685)return 'Priešpilnis (I ketv.)';
+  if(p<0.4815)return 'Augantis Mėnulis';
+  if(p<0.5185)return 'Pilnatis';
+  if(p<0.7315)return 'Dylantis Mėnulis';
+  if(p<0.7685)return 'Delčia (III ketv.)';
+  return 'Dylantis pjautuvas';}
+function moonEmoji(p){const e=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];return e[Math.floor(((p%1)*8)+0.5)%8];}
+
+/* Kirtimų paieška: grąžina laikus, kai f(t) kerta slenkstį */
+function crossings(t0,t1,stepMin,fn,thr){
+  const ups=[],downs=[]; let prev=fn(t0)-thr, pt=t0;
+  for(let t=t0.getTime()+stepMin*60000;t<=t1.getTime();t+=stepMin*60000){
+    const tt=new Date(t), cur=fn(tt)-thr;
+    if(prev<=0&&cur>0){const f=prev/(prev-cur);ups.push(new Date(pt.getTime()+f*(t-pt.getTime())));}
+    if(prev>=0&&cur<0){const f=prev/(prev-cur);downs.push(new Date(pt.getTime()+f*(t-pt.getTime())));}
+    prev=cur;pt=tt;}
+  return {ups,downs};}
+
+/* Planetos — supaprastinti Schlyter orbitų elementai (tikslumas ~kelios lanko min.) */
+const PLANETS=[
+ {id:'mer',name:'Merkurijus',el:[48.3313,3.24587e-5,7.0047,5e-8,29.1241,1.01444e-5,0.387098,0,0.205635,5.59e-10,168.6562,4.0923344368],m0:-0.4},
+ {id:'ven',name:'Venera',el:[76.6799,2.46590e-5,3.3946,2.75e-8,54.8910,1.38374e-5,0.723330,0,0.006773,-1.302e-9,48.0052,1.6021302244],m0:-4.3},
+ {id:'mar',name:'Marsas',el:[49.5574,2.11081e-5,1.8497,-1.78e-8,286.5016,2.92961e-5,1.523688,0,0.093405,2.516e-9,18.6021,0.5240207766],m0:-1.5},
+ {id:'jup',name:'Jupiteris',el:[100.4542,2.76854e-5,1.3030,-1.557e-7,273.8777,1.64505e-5,5.20256,0,0.048498,4.469e-9,19.8950,0.0830853001],m0:-9.3},
+ {id:'sat',name:'Saturnas',el:[113.6634,2.38980e-5,2.4886,-1.081e-7,339.3939,2.97661e-5,9.55475,0,0.055546,-9.499e-9,316.9670,0.0334442282],m0:-8.9},
+ {id:'ura',name:'Uranas',el:[74.0005,1.3978e-5,0.7733,1.9e-8,96.6612,3.0565e-5,19.18171,-1.55e-8,0.047318,7.45e-9,142.5905,0.011725806],m0:-7.2},
+ {id:'nep',name:'Neptūnas',el:[131.7806,3.0173e-5,1.7700,-2.55e-7,272.8461,-6.027e-6,30.05826,3.313e-8,0.008606,2.15e-9,260.2471,0.005995147],m0:-6.9}];
+function planetRaDec(p,date){
+  const d=toDays(date)+1.5; // Schlyter epocha 2451543.5
+  const [N0,Nd,i0,id_,w0,wd,a0,ad,e0,ed,M0,Md]=p.el;
+  const N=RAD*(N0+Nd*d), i=RAD*(i0+id_*d), w=RAD*(w0+wd*d), a=a0+ad*d, e=e0+ed*d;
+  let M=norm(RAD*(M0+Md*d));
+  let E=M+e*Math.sin(M)*(1+e*Math.cos(M));
+  for(let k=0;k<6;k++){E=E-(E-e*Math.sin(E)-M)/(1-e*Math.cos(E));}
+  const xv=a*(Math.cos(E)-e), yv=a*Math.sqrt(1-e*e)*Math.sin(E);
+  const v=Math.atan2(yv,xv), r=Math.hypot(xv,yv);
+  const xh=r*(Math.cos(N)*Math.cos(v+w)-Math.sin(N)*Math.sin(v+w)*Math.cos(i));
+  const yh=r*(Math.sin(N)*Math.cos(v+w)+Math.cos(N)*Math.sin(v+w)*Math.cos(i));
+  const zh=r*Math.sin(v+w)*Math.sin(i);
+  // Saulė
+  const ws=RAD*(282.9404+4.70935e-5*d), es=0.016709-1.151e-9*d, Ms=norm(RAD*(356.0470+0.9856002585*d));
+  const Es=Ms+es*Math.sin(Ms)*(1+es*Math.cos(Ms));
+  const xs0=Math.cos(Es)-es, ys0=Math.sqrt(1-es*es)*Math.sin(Es);
+  const vs=Math.atan2(ys0,xs0), rs=Math.hypot(xs0,ys0), ls=vs+ws;
+  const xg=xh+rs*Math.cos(ls), yg=yh+rs*Math.sin(ls), zg=zh;
+  const ecl=RAD*(23.4393-3.563e-7*d);
+  const xe=xg, ye=yg*Math.cos(ecl)-zg*Math.sin(ecl), ze=yg*Math.sin(ecl)+zg*Math.cos(ecl);
+  const ra=norm(Math.atan2(ye,xe)), dec=Math.atan2(ze,Math.hypot(xe,ye));
+  const dist=Math.hypot(xg,yg,zg);
+  const mag=Math.round((p.m0+5*Math.log10(Math.max(.05,r*dist)))*10)/10;
+  return {ra,dec,mag,dist};}
+
+/* ============ KATALOGAI ============ */
+/* [id, vardas, tipas, žvaigždynas, RA(val), Dec(°), ryškis, dydis('), sudėtingumas 1-3] */
+const TYPES={GX:'Galaktika',GC:'Kamuolinis sp.',OC:'Padrikasis sp.',EN:'Emisinis ūkas',PN:'Planetiškasis ūkas',
+  RN:'Atspindžio ūkas',SNR:'Supernovos liekana',AST:'Asterizmas',SC:'Žvaigždžių debesis',DS:'Dviguba žvaigždė'};
+const DSO=[
+["M1","Krabo ūkas","SNR","Tau",5.575,22.02,8.4,6,2],["M2","","GC","Aqr",21.558,-0.82,6.5,16,1],
+["M3","","GC","CVn",13.703,28.38,6.2,18,1],["M4","","GC","Sco",16.393,-26.53,5.9,26,2],
+["M5","","GC","Ser",15.310,2.08,5.7,23,1],["M6","Drugelio sp.","OC","Sco",17.668,-32.22,4.2,25,2],
+["M7","Ptolemajo sp.","OC","Sco",17.897,-34.79,3.3,80,2],["M8","Lagūnos ūkas","EN","Sgr",18.060,-24.38,6.0,90,2],
+["M9","","GC","Oph",17.320,-18.52,7.7,12,2],["M10","","GC","Oph",16.953,-4.10,6.6,20,1],
+["M11","Laukinių ančių sp.","OC","Sct",18.851,-6.27,5.8,14,1],["M12","","GC","Oph",16.787,-1.95,6.7,16,1],
+["M13","Heraklio sp.","GC","Her",16.695,36.46,5.8,20,1],["M14","","GC","Oph",17.627,-3.25,7.6,11,2],
+["M15","","GC","Peg",21.500,12.17,6.2,18,1],["M16","Erelio ūkas","EN","Ser",18.313,-13.78,6.0,35,2],
+["M17","Omegos (Gulbės) ūkas","EN","Sgr",18.340,-16.18,6.0,46,2],["M18","","OC","Sgr",18.330,-17.13,6.9,9,2],
+["M19","","GC","Oph",17.043,-26.27,6.8,17,2],["M20","Trilapio ūkas","EN","Sgr",18.045,-23.03,6.3,28,2],
+["M21","","OC","Sgr",18.075,-22.50,5.9,13,2],["M22","","GC","Sgr",18.607,-23.90,5.1,32,2],
+["M23","","OC","Sgr",17.950,-19.02,5.5,27,2],["M24","Šaulio žv. debesis","SC","Sgr",18.280,-18.55,4.6,90,2],
+["M25","","OC","Sgr",18.530,-19.25,4.6,32,2],["M26","","OC","Sct",18.755,-9.40,8.0,15,2],
+["M27","Hantelio ūkas","PN","Vul",19.993,22.72,7.4,8,1],["M28","","GC","Sgr",18.410,-24.87,6.8,11,2],
+["M29","","OC","Cyg",20.397,38.52,7.1,7,1],["M30","","GC","Cap",21.673,-23.18,7.2,11,2],
+["M31","Andromedos galaktika","GX","And",0.712,41.27,3.4,178,1],["M32","","GX","And",0.713,40.87,8.1,8,2],
+["M33","Trikampio galaktika","GX","Tri",1.564,30.66,5.7,62,2],["M34","","OC","Per",2.700,42.78,5.5,35,1],
+["M35","","OC","Gem",6.148,24.34,5.1,28,1],["M36","","OC","Aur",5.605,34.14,6.0,12,1],
+["M37","","OC","Aur",5.873,32.55,5.6,20,1],["M38","","OC","Aur",5.478,35.85,6.4,21,1],
+["M39","","OC","Cyg",21.530,48.43,4.6,32,1],["M40","Winnecke 4","DS","UMa",12.370,58.08,8.4,1,2],
+["M41","","OC","CMa",6.767,-20.73,4.5,38,1],["M42","Oriono ūkas","EN","Ori",5.588,-5.39,4.0,85,1],
+["M43","de Mairano ūkas","EN","Ori",5.593,-5.27,9.0,20,2],["M44","Avilio (Prakartėlės) sp.","OC","Cnc",8.670,19.98,3.1,95,1],
+["M45","Sietynas (Plejados)","OC","Tau",3.790,24.12,1.6,110,1],["M46","","OC","Pup",7.697,-14.81,6.1,27,2],
+["M47","","OC","Pup",7.610,-14.50,4.4,30,2],["M48","","OC","Hya",8.230,-5.80,5.8,54,1],
+["M49","","GX","Vir",12.497,8.00,8.4,9,2],["M50","","OC","Mon",7.053,-8.33,5.9,16,1],
+["M51","Sūkurio galaktika","GX","CVn",13.498,47.20,8.4,11,2],["M52","","OC","Cas",23.413,61.59,6.9,13,1],
+["M53","","GC","Com",13.215,18.17,7.6,13,2],["M54","","GC","Sgr",18.918,-30.48,7.6,9,3],
+["M55","","GC","Sgr",19.667,-30.96,6.3,19,3],["M56","","GC","Lyr",19.277,30.18,8.3,7,2],
+["M57","Žiedo ūkas","PN","Lyr",18.893,33.03,8.8,1.4,1],["M58","","GX","Vir",12.628,11.82,9.7,5,3],
+["M59","","GX","Vir",12.700,11.65,9.6,5,3],["M60","","GX","Vir",12.728,11.55,8.8,7,2],
+["M61","","GX","Vir",12.365,4.47,9.7,6,3],["M62","","GC","Oph",17.020,-30.11,6.5,14,2],
+["M63","Saulėgrąžos galaktika","GX","CVn",13.264,42.03,8.6,12,2],["M64","Juodosios akies gal.","GX","Com",12.945,21.68,8.5,9,2],
+["M65","","GX","Leo",11.315,13.09,9.3,8,2],["M66","","GX","Leo",11.337,12.99,8.9,9,2],
+["M67","","OC","Cnc",8.840,11.81,6.1,30,1],["M68","","GC","Hya",12.658,-26.74,7.8,11,3],
+["M69","","GC","Sgr",18.523,-32.35,7.6,7,3],["M70","","GC","Sgr",18.720,-32.29,7.9,8,3],
+["M71","","GC","Sge",19.896,18.78,8.2,7,2],["M72","","GC","Aqr",20.891,-12.54,9.3,6,3],
+["M73","","AST","Aqr",20.983,-12.63,9.0,2.8,3],["M74","Fantominė galaktika","GX","Psc",1.612,15.78,9.4,10,3],
+["M75","","GC","Sgr",20.101,-21.92,8.5,7,3],["M76","Mažasis Hantelis","PN","Per",1.705,51.57,10.1,2.7,2],
+["M77","","GX","Cet",2.711,-0.01,8.9,7,2],["M78","","RN","Ori",5.779,0.08,8.3,8,2],
+["M79","","GC","Lep",5.402,-24.52,7.7,9,3],["M80","","GC","Sco",16.284,-22.98,7.3,10,2],
+["M81","Bodės galaktika","GX","UMa",9.926,69.07,6.9,27,1],["M82","Cigaro galaktika","GX","UMa",9.931,69.68,8.4,11,1],
+["M83","Pietinis Sūkurys","GX","Hya",13.617,-29.87,7.5,13,3],["M84","","GX","Vir",12.417,12.89,9.1,6,2],
+["M85","","GX","Com",12.423,18.19,9.1,7,2],["M86","","GX","Vir",12.436,12.95,8.9,9,2],
+["M87","Mergelės A","GX","Vir",12.514,12.39,8.6,8,2],["M88","","GX","Com",12.533,14.42,9.6,7,3],
+["M89","","GX","Vir",12.594,12.56,9.8,5,3],["M90","","GX","Vir",12.613,13.16,9.5,9,3],
+["M91","","GX","Com",12.590,14.50,10.2,5,3],["M92","","GC","Her",17.285,43.14,6.3,14,1],
+["M93","","OC","Pup",7.742,-23.85,6.0,22,2],["M94","","GX","CVn",12.848,41.12,8.2,11,2],
+["M95","","GX","Leo",10.732,11.70,9.7,7,3],["M96","","GX","Leo",10.779,11.82,9.2,8,2],
+["M97","Pelėdos ūkas","PN","UMa",11.246,55.02,9.9,3.4,2],["M98","","GX","Com",12.230,14.90,10.1,10,3],
+["M99","","GX","Com",12.314,14.42,9.9,5,3],["M100","","GX","Com",12.382,15.82,9.3,7,3],
+["M101","Vėjo malūno galaktika","GX","UMa",14.053,54.35,7.9,29,2],["M102","NGC 5866","GX","Dra",15.108,55.76,9.9,5,3],
+["M103","","OC","Cas",1.556,60.65,7.4,6,1],["M104","Sombrero galaktika","GX","Vir",12.667,-11.62,8.0,9,2],
+["M105","","GX","Leo",10.797,12.58,9.3,5,3],["M106","","GX","CVn",12.316,47.30,8.4,19,2],
+["M107","","GC","Oph",16.542,-13.05,7.9,13,2],["M108","","GX","UMa",11.191,55.67,10.0,8,3],
+["M109","","GX","UMa",11.960,53.37,9.8,8,3],["M110","","GX","And",0.673,41.69,8.1,22,2],
+// Populiarūs NGC / Caldwell / kt.
+["NGC869/884","h ir χ Persėjo (Dvigubas sp.)","OC","Per",2.330,57.13,4.3,60,1],
+["NGC7000","Šiaurės Amerikos ūkas","EN","Cyg",20.970,44.33,4.0,120,3],
+["NGC6960","Šluotos (Vakarų Vualio) ūkas","SNR","Cyg",20.763,30.71,7.0,70,3],
+["NGC6992","Rytų Vualio ūkas","SNR","Cyg",20.940,31.72,7.0,75,3],
+["NGC253","Skulptoriaus galaktika","GX","Scl",0.793,-25.29,7.2,27,3],
+["NGC891","","GX","And",2.375,42.35,10.0,13,3],
+["NGC7331","","GX","Peg",22.617,34.42,9.5,10,3],
+["NGC4565","Adatos galaktika","GX","Com",12.605,25.99,10.4,16,3],
+["NGC2244","Rozetės ūko sp.","OC","Mon",6.530,4.95,4.8,24,2],
+["NGC6946","Fejerverkų galaktika","GX","Cep",20.581,60.15,9.6,11,3],
+["NGC457","Pelėdos (E.T.) sp.","OC","Cas",1.325,58.33,6.4,13,1],
+["NGC663","","OC","Cas",1.770,61.25,7.1,16,1],
+["NGC7789","Karolinos rožė","OC","Cas",23.960,56.72,6.7,16,2],
+["NGC6826","Mirksintis ūkas","PN","Cyg",19.747,50.52,8.8,0.5,2],
+["NGC7662","Mėlynojo gniūžčio ūkas","PN","And",23.430,42.55,8.3,0.6,2],
+["NGC2392","Eskimo ūkas","PN","Gem",7.487,20.91,9.1,0.8,2],
+["NGC6543","Katės akies ūkas","PN","Dra",17.976,66.63,8.1,0.4,2],
+["Cr399","Kabyklos asterizmas","AST","Vul",19.420,20.18,3.6,60,1],
+["Mel111","Berenikės Garbanų sp.","OC","Com",12.420,25.85,1.8,275,1],
+["NGC752","","OC","And",1.960,37.68,5.7,50,1],
+["St2","Stock 2 (Raumeningasis)","OC","Cas",2.250,59.50,4.4,60,1],
+["NGC1502","Kemble kaskada + sp.","OC","Cam",4.130,62.33,6.9,8,2],
+["NGC2903","","GX","Leo",9.535,21.50,9.0,13,2],
+["NGC4631","Banginio galaktika","GX","CVn",12.700,32.54,9.2,15,3],
+["NGC5907","Skeveldros galaktika","GX","Dra",15.265,56.33,10.3,13,3]
+].map(r=>({id:r[0],name:r[1],type:r[2],con:r[3],ra:r[4]*15*RAD,dec:r[5]*RAD,mag:r[6],size:r[7],diff:r[8]}));
+const DSOIDX=Object.fromEntries(DSO.map(o=>[o.id,o]));
+
+const CONLT={And:'Andromeda',Ant:'Siurblys',Aps:'Rojaus Paukštis',Aqr:'Vandenis',Aql:'Erelis',Ara:'Aukuras',
+Ari:'Avinas',Aur:'Vežėjas',Boo:'Jaučiaganis',Cae:'Kaltas',Cam:'Žirafa',Cnc:'Vėžys',CVn:'Skalikai',
+CMa:'Didysis Šuo',CMi:'Mažasis Šuo',Cap:'Ožiaragis',Car:'Kilis',Cas:'Kasiopėja',Cen:'Kentauras',Cep:'Cefėjas',
+Cet:'Banginis',Cha:'Chameleonas',Cir:'Skriestuvas',Col:'Balandis',Com:'Berenikės Garbanos',CrA:'Pietų Vainikas',
+CrB:'Šiaurės Vainikas',Crv:'Varnas',Crt:'Taurė',Cru:'Pietų Kryžius',Cyg:'Gulbė',Del:'Delfinas',Dor:'Aukso Žuvis',
+Dra:'Slibinas',Equ:'Arkliukas',Eri:'Eridanas',For:'Krosnis',Gem:'Dvyniai',Gru:'Gervė',Her:'Heraklis',
+Hor:'Laikrodis',Hya:'Hidra',Hyi:'Mažoji Hidra',Ind:'Indėnas',Lac:'Driežas',Leo:'Liūtas',LMi:'Mažasis Liūtas',
+Lep:'Kiškis',Lib:'Svarstyklės',Lup:'Vilkas',Lyn:'Lūšis',Lyr:'Lyra',Men:'Stalas',Mic:'Mikroskopas',
+Mon:'Vienaragis',Mus:'Musė',Nor:'Kampainis',Oct:'Oktantas',Oph:'Gyvatnešis',Ori:'Orionas',Pav:'Povas',
+Peg:'Pegasas',Per:'Persėjas',Phe:'Feniksas',Pic:'Tapytojas',Psc:'Žuvys',PsA:'Pietų Žuvis',Pup:'Laivagalis',
+Pyx:'Kompasas',Ret:'Tinklelis',Sge:'Strėlė',Sgr:'Šaulys',Sco:'Skorpionas',Scl:'Skulptorius',Sct:'Skydas',
+Ser:'Gyvatė',Sex:'Sekstantas',Tau:'Jautis',Tel:'Teleskopas',Tri:'Trikampis',TrA:'Pietų Trikampis',Tuc:'Tukanas',
+UMa:'Didieji Grįžulo Ratai',UMi:'Mažieji Grįžulo Ratai',Vel:'Burės',Vir:'Mergelė',Vol:'Skrajojanti Žuvis',Vul:'Lapė'};
+
+const BORTLE=[null,
+'1 — Tobulas tamsus dangus','2 — Tikrai tamsus dangus','3 — Kaimo dangus','4 — Kaimo/priemiesčio riba',
+'5 — Priemiesčio dangus','6 — Šviesus priemiestis','7 — Priemiesčio/miesto riba','8 — Miesto dangus','9 — Miesto centras'];
+const SEASONS={ziema:[11,0,1],pavasaris:[2,3,4],vasara:[5,6,7],ruduo:[8,9,10]};
+function objSeason(o){ // sezonas pagal kulminaciją vidurnaktį: RA(val) ~ Saulės RA+12
+  const raH=o.ra*DEG/15; // kulminuoja vidurnaktį, kai Saulės RA ≈ raH-12
+  const m=Math.round(((raH-12+24)%24)/24*12+2.7)%12; // apytikslis mėnuo (0-11)
+  for(const[s,ms]of Object.entries(SEASONS))if(ms.includes(m))return s;
+  return 'ruduo';}
+const SEASONLT={ziema:'Žiema',pavasaris:'Pavasaris',vasara:'Vasara',ruduo:'Ruduo'};
+
+/* ============ NAKTIES ANALIZĖ ============ */
+const fmtT=d=>d?d.toLocaleTimeString('lt-LT',{hour:'2-digit',minute:'2-digit'}):'—';
+const fmtD=d=>d.toLocaleDateString('lt-LT',{month:'2-digit',day:'2-digit'});
+const fmtDL=d=>d.toLocaleDateString('lt-LT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+const hrs=ms=>Math.round(ms/360000)/10;
+const fmtN=x=>(x==null||isNaN(x))?'—':(Math.round(x*10)/10).toLocaleString('lt-LT');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* Vienos nakties (prasidedančios datą D) analizė */
+function nightInfo(dateNoon,lat,lon){
+  const t0=new Date(dateNoon); t0.setHours(12,0,0,0);
+  const t1=new Date(t0.getTime()+DAYMS);
+  const f=t=>sunAlt(t,lat,lon)*DEG;
+  let thr=-18, kind='astro';
+  let c=crossings(t0,t1,6,f,thr);
+  if(!c.downs.length||!c.ups.length){thr=-12;kind='naut';c=crossings(t0,t1,6,f,thr);}
+  if(!c.downs.length||!c.ups.length){
+    const cs=crossings(t0,t1,6,f,-0.833);
+    return {date:t0,kind:'none',sunset:cs.downs[0]||null,sunrise:cs.ups[0]||null,
+      darkStart:null,darkEnd:null,illum:moonIllum(new Date(t0.getTime()+DAYMS/2)).fraction,
+      phase:moonIllum(new Date(t0.getTime()+DAYMS/2)).phase,freeWins:[],moonWins:[],freeH:0,cls:'none'};}
+  const darkStart=c.downs[0], darkEnd=c.ups.find(u=>u>darkStart)||t1;
+  const cs=crossings(t0,t1,6,f,-0.833);
+  const mid=new Date((darkStart.getTime()+darkEnd.getTime())/2);
+  const il=moonIllum(mid);
+  // Mėnulio buvimo segmentai tamsos lange
+  const step=5*60000, freeWins=[], moonWins=[];
+  let cur=null, curM=null;
+  for(let t=darkStart.getTime();t<=darkEnd.getTime();t+=step){
+    const up=moonAlt(new Date(t),lat,lon)>-0.005;
+    if(!up){ if(!cur)cur={a:t}; cur.b=t; if(curM){moonWins.push(curM);curM=null;} }
+    else { if(!curM)curM={a:t}; curM.b=t; if(cur){freeWins.push(cur);cur=null;} }
+  }
+  if(cur)freeWins.push(cur); if(curM)moonWins.push(curM);
+  const freeH=freeWins.reduce((s,w)=>s+(w.b-w.a),0)/3600000;
+  const darkH=(darkEnd-darkStart)/3600000;
+  const dim=il.fraction<=0.20;
+  let cls;
+  if(dim&&darkH>=1.5) cls='ideal';
+  else if(freeH>=2.5) cls='ideal';
+  else if(freeH>=1||(dim&&darkH>=0.7)) cls='part';
+  else if(freeH>=0.4) cls='poor';
+  else cls='bad';
+  if(kind==='naut'&&cls==='ideal') cls='part';
+  // Mėnulio patekėjimas/nusileidimas per parą
+  const mf=t=>moonAlt(t,lat,lon)*DEG;
+  const mc=crossings(t0,t1,6,mf,0.125);
+  return {date:t0,kind,sunset:cs.downs[0]||null,sunrise:cs.ups[0]||null,darkStart,darkEnd,darkH,
+    illum:il.fraction,phase:il.phase,freeWins,moonWins,freeH,cls,dim,
+    moonrise:mc.ups[0]||null,moonset:mc.downs[0]||null};}
+
+const CLSLT={ideal:'Puiki',part:'Gera iš dalies',poor:'Trumpas langas',bad:'Netinkama',none:'Be astronominės tamsos'};
+const CLSB={ideal:'b-ideal',part:'b-part',poor:'b-poor',bad:'b-bad',none:'b-none'};
+
+/* ============ ORAI (Open-Meteo, nemokama, be rakto) ============ */
+const Weather={data:null,aod:null,fetchedAt:0,loc:'',
+  async load(lat,lon,force){
+    const key=lat.toFixed(2)+','+lon.toFixed(2);
+    if(!force&&this.data&&this.loc===key&&Date.now()-this.fetchedAt<45*60000)return this.data;
+    const u='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+
+      '&hourly=temperature_2m,dewpoint_2m,relative_humidity_2m,cloudcover,cloudcover_low,cloudcover_mid,cloudcover_high,windspeed_10m,windgusts_10m,visibility&forecast_days=8&timezone=auto';
+    const r=await fetch(u); if(!r.ok)throw new Error('weather');
+    this.data=await r.json(); this.fetchedAt=Date.now(); this.loc=key;
+    try{ const ua='https://air-quality-api.open-meteo.com/v1/air-quality?latitude='+lat+'&longitude='+lon+
+      '&hourly=aerosol_optical_depth&forecast_days=5&timezone=auto';
+      const ra=await fetch(ua); if(ra.ok)this.aod=await ra.json(); }catch(e){this.aod=null;}
+    return this.data;},
+  at(t){ // valandiniai duomenys artimiausiai valandai
+    if(!this.data)return null;
+    const H=this.data.hourly, iso=new Date(t); iso.setMinutes(0,0,0);
+    const tz=this.data.utc_offset_seconds*1000;
+    const local=new Date(iso.getTime()+tz).toISOString().slice(0,13)+':00';
+    const i=H.time.indexOf(local); if(i<0)return null;
+    const aod=(()=>{if(!this.aod)return null;const j=this.aod.hourly.time.indexOf(local);
+      return j>=0?this.aod.hourly.aerosol_optical_depth[j]:null;})();
+    return {t:H.temperature_2m[i],td:H.dewpoint_2m[i],rh:H.relative_humidity_2m[i],
+      cc:H.cloudcover[i],cl:H.cloudcover_low[i],cm:H.cloudcover_mid[i],ch:H.cloudcover_high[i],
+      ws:H.windspeed_10m[i],wg:H.windgusts_10m[i],vis:H.visibility?H.visibility[i]:null,aod};},
+  nightAvg(n){ // vid. per tamsos langą
+    if(!n.darkStart)return null;
+    const samples=[];
+    for(let t=n.darkStart.getTime();t<=n.darkEnd.getTime();t+=3600000){
+      const w=this.at(new Date(t)); if(w)samples.push(w);}
+    if(!samples.length)return null;
+    const avg=k=>samples.reduce((s,w)=>s+(w[k]??0),0)/samples.length;
+    const o={t:avg('t'),td:avg('td'),rh:avg('rh'),cl:avg('cl'),cm:avg('cm'),ch:avg('ch'),ws:avg('ws')};
+    o.aod=(()=>{const a=samples.map(s=>s.aod).filter(x=>x!=null);return a.length?a.reduce((s,x)=>s+x,0)/a.length:null;})();
+    o.eff=0.55*o.cl+0.30*o.cm+0.15*o.ch;
+    return o;}};
+function cloudColor(c){return c<=15?'var(--good)':c<=40?'var(--warn)':c<=70?'var(--poor)':'var(--bad)';}
+function nightScore(n,w){ // 0-10 stebėjimo indeksas
+  if(n.cls==='none')return {v:0,txt:'nėra tamsos'};
+  const darkF={ideal:1,part:0.7,poor:0.45,bad:0.15}[n.cls];
+  if(!w)return {v:Math.round(darkF*10),txt:'be orų prognozės'};
+  let clear=(100-w.eff)/100;
+  let transp=1; if(w.rh>92)transp-=0.18; if((w.t-w.td)<1.5)transp-=0.15;
+  if(w.aod!=null&&w.aod>0.25)transp-=0.12; if(w.ws>32)transp-=0.1;
+  const v=Math.max(0,Math.min(10,Math.round(darkF*clear*Math.max(.3,transp)*10)));
+  return {v,txt:null};}
+function scoreColor(v){return v>=7?'var(--good)':v>=5?'var(--warn)':v>=3?'var(--poor)':'var(--bad)';}
+
+/* ============ BŪSENA ============ */
+const App={
+  loc:{lat:54.687,lon:25.280,name:'Vilnius',bortle:6},
+  watch:[], session:null, nightsCache:{}, calMonth:null, weatherOK:false,
+  settings:{notif:false,stars8:false,lastNotif:''},
+};
+function nightFor(date,off=0){
+  const d=new Date(date); d.setDate(d.getDate()+off); d.setHours(12,0,0,0);
+  const k=App.loc.lat.toFixed(2)+','+App.loc.lon.toFixed(2)+':'+d.toDateString();
+  if(!App.nightsCache[k])App.nightsCache[k]=nightInfo(d,App.loc.lat,App.loc.lon);
+  return App.nightsCache[k];}
+function toast(msg,ms=2600){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';
+  clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms);}
+async function saveAll(){await Store.set('loc',App.loc);await Store.set('watch',App.watch);
+  await Store.set('settings',App.settings);}
+
+/* Objekto matomumas šią naktį */
+function objTonight(o,n){
+  if(!n.darkStart)return null;
+  const f=t=>altazFromRaDec(o.ra,o.dec,t,App.loc.lat,App.loc.lon).alt*DEG;
+  let maxAlt=-90,maxT=null;
+  const step=12*60000;
+  for(let t=n.darkStart.getTime();t<=n.darkEnd.getTime();t+=step){
+    const a=f(new Date(t)); if(a>maxAlt){maxAlt=a;maxT=new Date(t);}}
+  const c20=crossings(new Date(n.darkStart.getTime()-6*3600000),new Date(n.darkEnd.getTime()+6*3600000),10,f,20);
+  // tranzitas (kulminacija): kada vietinis žvaigždinis laikas = RA
+  const d0=toDays(n.darkStart);
+  let dH=norm(o.ra-sidereal(d0,App.loc.lon)); // rad iki tranzito
+  const transit=new Date(n.darkStart.getTime()+dH/TAU*86164090);
+  const solarMid=new Date((n.sunset&&n.sunrise)?(n.sunset.getTime()+n.sunrise.getTime())/2:(n.darkStart.getTime()+n.darkEnd.getTime())/2);
+  const peak=Math.abs(transit-solarMid)<45*60000&&transit>n.darkStart&&transit<n.darkEnd;
+  return {maxAlt,maxT,transit,peak,rise20:c20.ups[0]||null,set20:c20.downs.find(x=>x>(c20.ups[0]||0))||null};}
+
+/* ============ ŠĮVAKAR ============ */
+async function renderTonight(){
+  const v=document.getElementById('v-tonight');
+  const n=nightFor(new Date(), new Date().getHours()<12?-1:0);
+  const wn=App.weatherOK?Weather.nightAvg(n):null;
+  const sc=nightScore(n,wn);
+  const nowW=App.weatherOK?Weather.at(new Date()):null;
+  let html='';
+  // Antraštė + indeksas
+  html+=`<div class="card"><p class="eyebrow">${esc(fmtDL(n.date))} · naktis</p>
+    <div style="display:flex;align-items:center;gap:1rem;margin:.3rem 0 .6rem">
+      <div style="font-size:2.6rem;font-family:'Space Grotesk';font-weight:700;color:${scoreColor(sc.v)}">${sc.v}<span style="font-size:1rem;color:var(--dim)">/10</span></div>
+      <div style="flex:1"><span class="badge ${CLSB[n.cls]}">${CLSLT[n.cls]}</span>
+      <div class="small muted" style="margin-top:.3rem">${sc.txt?esc(sc.txt):'Stebėjimo indeksas: tamsa × debesuotumas × skaidrumas'}</div></div></div>
+    <div class="grid3">
+      <div class="stat"><div class="v">${fmtT(n.sunset)} / ${fmtT(n.sunrise)}</div><div class="k">Saulė leidžiasi / teka</div></div>
+      <div class="stat"><div class="v">${fmtT(n.darkStart)} – ${fmtT(n.darkEnd)}</div><div class="k">${n.kind==='naut'?'Navigacinės sutemos (vasara!)':'Astronominė tamsa'}</div></div>
+      <div class="stat"><div class="v">${moonEmoji(n.phase)} ${Math.round(n.illum*100)}%</div><div class="k">${esc(moonPhaseName(n.phase))}</div></div>
+      <div class="stat"><div class="v">${fmtT(n.moonrise)} / ${fmtT(n.moonset)}</div><div class="k">Mėnulis teka / leidžiasi</div></div>
+      <div class="stat"><div class="v">${n.freeH?n.freeH.toFixed(1)+' h':(n.dim?'visa naktis':'0 h')}</div><div class="k">Tamsa be Mėnulio</div></div>
+      <div class="stat"><div class="v">${App.loc.bortle?'B'+App.loc.bortle:'—'}</div><div class="k">Bortle (vietos)</div></div>
+    </div>`;
+  if(n.freeWins.length&&!n.dim){
+    html+=`<div class="windows" style="margin-top:.6rem">`+n.freeWins.map(w=>
+      `<div class="winrow"><span class="badge b-ideal">Langas</span> ${fmtT(new Date(w.a))} – ${fmtT(new Date(w.b))} be Mėnulio</div>`).join('')+`</div>`;}
+  html+=`</div>`;
+  // Orai dabar + nakties prognozė
+  html+=`<div class="card"><h2>Astro orai <span class="sub">Open-Meteo</span></h2>`;
+  if(!App.weatherOK){html+=`<p class="muted small">Orų prognozė nepasiekiama. Patikrinkite interneto ryšį (Claude peržiūros lange išoriniai API gali būti blokuojami — įkėlus į savo svetainę veiks). <button class="btn sm" onclick="initWeather(true)">Bandyti dar kartą</button></p>`;}
+  else{
+    const w=wn||nowW;
+    if(w){html+=`<div class="grid3">
+      <div class="stat"><div class="v" style="color:${cloudColor(w.eff??w.cc)}">${Math.round(w.eff??w.cc)}%</div><div class="k">Debesuotumas naktį (svert.)</div></div>
+      <div class="stat"><div class="v">${Math.round(w.cl)}/${Math.round(w.cm)}/${Math.round(w.ch)}%</div><div class="k">Žemi / vid. / aukšti debesys</div></div>
+      <div class="stat"><div class="v">${w.t.toFixed(0)}° / ${w.td.toFixed(0)}°</div><div class="k">Temp. / rasos taškas ${(w.t-w.td)<2?'⚠️ rasos rizika':''}</div></div>
+      <div class="stat"><div class="v">${Math.round(w.rh)}%</div><div class="k">Drėgnis</div></div>
+      <div class="stat"><div class="v">${Math.round(w.ws)} km/h</div><div class="k">Vėjas</div></div>
+      <div class="stat"><div class="v">${w.aod!=null?w.aod.toFixed(2):'—'}</div><div class="k">Aerozoliai (skaidrumas)${w.aod!=null?(w.aod<0.15?' · puikus':w.aod<0.3?' · geras':' · prastas'):''}</div></div>
+    </div>`;}
+    html+=`<div id="hourlyTonight" style="margin-top:.7rem"></div>`;}
+  html+=`</div>`;
+  // Pranešimas apie rytojų
+  const n2=nightFor(new Date(),1), w2=App.weatherOK?Weather.nightAvg(n2):null, sc2=nightScore(n2,w2);
+  html+=`<div class="alertbox">🔔 <b>Rytoj naktį (${fmtD(n2.date)}):</b> <span class="badge ${CLSB[n2.cls]}">${CLSLT[n2.cls]}</span>
+    indeksas <b style="color:${scoreColor(sc2.v)}">${sc2.v}/10</b>${w2?`, debesuotumas ~${Math.round(w2.eff)}%`:''}.
+    ${App.settings.notif?'':'<button class="btn sm" style="margin-left:.4rem" onclick="enableNotif()">Įjungti pranešimus</button>'}</div>`;
+  // Planetos
+  html+=`<div class="card"><h2>Planetos šiąnakt</h2><div id="planetsBox">`+planetsHTML(n)+`</div></div>`;
+  // Watchlistas
+  html+=`<div class="card"><h2>Stebėjimo sąrašas <span class="sub">${App.watch.length} obj.</span></h2><div id="watchBox">`+watchHTML(n)+`</div></div>`;
+  // Rekomendacijos
+  html+=`<div class="card"><h2>Šįvakar verta stebėti <span class="sub">pagal aukštį, ryškį ir sezoną</span></h2>`+recoHTML(n)+`</div>`;
+  v.innerHTML=html;
+  if(App.weatherOK)renderHourly(n);
+}
+function planetsHTML(n){
+  const now=new Date(); let out='';
+  for(const p of PLANETS){
+    const pos=planetRaDec(p,now);
+    const aa=altazFromRaDec(pos.ra,pos.dec,now,App.loc.lat,App.loc.lon);
+    const t0=new Date(now); t0.setHours(12,0,0,0); if(now.getHours()<12)t0.setDate(t0.getDate()-1);
+    const t1=new Date(t0.getTime()+DAYMS);
+    const f=t=>{const q=planetRaDec(p,t);return altazFromRaDec(q.ra,q.dec,t,App.loc.lat,App.loc.lon).alt*DEG;};
+    const c=crossings(t0,t1,15,f,0);
+    const vis=n.darkStart?(f(n.darkStart)>10||f(n.darkEnd)>10||(c.ups[0]&&c.ups[0]>n.darkStart&&c.ups[0]<n.darkEnd)):aa.alt>0;
+    out+=`<div class="obj-row" onclick="openPlanet('${p.id}')">
+      <div class="obj-ico">${{mer:'☿',ven:'♀',mar:'♂',jup:'♃',sat:'♄',ura:'♅',nep:'♆'}[p.id]}</div>
+      <div class="obj-main"><div class="t">${p.name} <span class="muted small">${pos.mag.toFixed(1)}ᵐ</span>
+        ${vis?'<span class="badge b-acc">matoma naktį</span>':''}</div>
+      <div class="s">teka ${fmtT(c.ups[0])} · leidžiasi ${fmtT(c.downs[0])} · dabar ${Math.round(aa.alt*DEG)}° aukštyje</div></div></div>`;}
+  return out;}
+function recoList(n){
+  if(!n.darkStart)return [];
+  const moonBad=!n.dim&&n.freeH<1.5;
+  return DSO.map(o=>{
+    const t=objTonight(o,n); if(!t||t.maxAlt<18)return null;
+    let s=t.maxAlt/90*48+(10.5-Math.min(10.5,o.mag))*4.6+(t.peak?17:0)-(o.diff-1)*3;
+    if(moonBad&&(o.type==='GX'||o.type==='EN'||o.type==='RN'||o.type==='SNR'))s-=22;
+    return {o,t,s};}).filter(Boolean).sort((a,b)=>b.s-a.s);}
+function recoHTML(n){
+  const list=recoList(n).slice(0,12);
+  if(!list.length)return '<p class="empty">Šiąnakt nėra tinkamos tamsos arba objektų virš horizonto.</p>';
+  return list.map(({o,t})=>`<div class="obj-row" onclick="openObj('${o.id}')">
+    <div class="obj-ico">${esc(o.id.replace('NGC','N'))}</div>
+    <div class="obj-main"><div class="t">${esc(o.name||o.id)} ${t.peak?'<span class="badge b-gold">★ metų pikas</span>':''}
+      ${t.maxAlt>60?'<span class="badge b-acc">aukštai</span>':''}</div>
+    <div class="s">${TYPES[o.type]||o.type} · ${CONLT[o.con]||o.con} · ${o.mag}ᵐ · maks. ${Math.round(t.maxAlt)}° ${fmtT(t.maxT)}</div></div>
+    <div class="obj-side">virš 20°<br>${fmtT(t.rise20)}–${fmtT(t.set20)}</div></div>`).join('');}
+function watchHTML(n){
+  if(!App.watch.length)return '<p class="empty">Sąrašas tuščias. Pridėkite objektų iš katalogo arba žvaigždėlapio.</p>';
+  return App.watch.map(id=>{const o=DSOIDX[id];if(!o)return '';
+    const t=n.darkStart?objTonight(o,n):null;
+    return `<div class="obj-row"><div class="obj-ico" onclick="openObj('${o.id}')">${esc(o.id.replace('NGC','N'))}</div>
+    <div class="obj-main" onclick="openObj('${o.id}')"><div class="t">${esc(o.name||o.id)}</div>
+    <div class="s">${t?(t.maxAlt>10?`maks. ${Math.round(t.maxAlt)}° apie ${fmtT(t.maxT)}`:'šiąnakt žemai/nematomas'):'—'}</div></div>
+    <button class="btn sm" onclick="locateObj('${o.id}')">⊕ Danguje</button></div>`;}).join('');}
+function renderHourly(n){
+  const box=document.getElementById('hourlyTonight'); if(!box||!n.sunset)return;
+  const start=new Date(n.sunset.getTime()-3600000), end=new Date((n.sunrise||n.darkEnd||start).getTime()+3600000);
+  let rows='';
+  for(let t=start.getTime();t<=end.getTime();t+=3600000){
+    const w=Weather.at(new Date(t)); if(!w)continue;
+    const dk=n.darkStart&&t>=n.darkStart.getTime()&&t<=n.darkEnd.getTime();
+    const mu=moonAlt(new Date(t),App.loc.lat,App.loc.lon)>0;
+    rows+=`<tr style="${dk?'background:rgba(39,64,107,.18)':''}"><td>${fmtT(new Date(t))}${dk?' ✦':''}</td>
+      <td><span class="cl" style="background:${cloudColor(w.cc)}22;color:${cloudColor(w.cc)}">${w.cc}</span></td>
+      <td class="small">${w.cl}/${w.cm}/${w.ch}</td><td>${w.t.toFixed(0)}°</td><td>${w.td.toFixed(0)}°</td>
+      <td>${Math.round(w.ws)}</td><td>${mu?moonEmoji(n.phase):'—'}</td></tr>`;}
+  if(rows)box.innerHTML=`<table class="wx"><tr><th>Val.</th><th>☁%</th><th>ž/v/a</th><th>T</th><th>Rasa</th><th>Vėjas</th><th>Mėn.</th></tr>${rows}</table>`;}
+
+/* ============ KALENDORIUS ============ */
+function renderCal(){
+  const v=document.getElementById('v-cal');
+  if(!App.calMonth){App.calMonth=new Date();App.calMonth.setDate(1);}
+  const M=App.calMonth, today=new Date();
+  let html=`<div class="card"><div class="cal-head">
+    <button class="btn sm" onclick="calNav(-1)">‹</button>
+    <h2 style="flex:1;text-align:center">${M.toLocaleDateString('lt-LT',{month:'long',year:'numeric'})}</h2>
+    <button class="btn sm" onclick="calNav(1)">›</button></div>
+    <div class="legend"><span><i class="q-ideal"></i>Puiki</span><span><i class="q-part"></i>Iš dalies</span>
+    <span><i class="q-poor"></i>Trumpas langas</span><span><i class="q-bad"></i>Netinkama</span><span><i class="q-none"></i>Be tamsos</span></div>
+    <div class="cal">`;
+  for(const d of ['Pr','An','Tr','Kt','Pn','Št','Sk'])html+=`<div class="dow">${d}</div>`;
+  const first=new Date(M), pad=(first.getDay()+6)%7;
+  first.setDate(1-pad);
+  for(let i=0;i<42;i++){
+    const d=new Date(first); d.setDate(first.getDate()+i);
+    if(i===35&&d.getMonth()!==M.getMonth())break;
+    const out=d.getMonth()!==M.getMonth();
+    const n=nightFor(d,0);
+    const isToday=d.toDateString()===today.toDateString();
+    // mini juosta: 17:00–08:00 ašis
+    const ax0=new Date(d);ax0.setHours(17,0,0,0); const axLen=15*3600000;
+    const px=t=>Math.max(0,Math.min(100,((t-ax0)/axLen)*100));
+    let bar='';
+    if(n.darkStart){bar+=`<span class="dark" style="left:${px(n.darkStart)}%;right:${100-px(n.darkEnd)}%"></span>`;
+      for(const w of n.freeWins)bar+=`<span class="free" style="left:${px(w.a)}%;right:${100-px(w.b)}%"></span>`;
+      if(!n.dim)for(const w of n.moonWins)bar+=`<span class="moonseg" style="left:${px(w.a)}%;right:${100-px(w.b)}%;opacity:.55"></span>`;}
+    html+=`<div class="day ${out?'out':''} ${isToday?'today':''}" onclick="openDay(${d.getTime()})">
+      <div class="d"><span>${d.getDate()}</span><span class="qdot q-${n.cls}"></span></div>
+      <div class="nightbar">${bar}</div>
+      <div class="moon">${moonEmoji(n.phase)} ${Math.round(n.illum*100)}%${n.dim&&n.cls==='ideal'?'':' '}${!n.dim&&n.freeH>=1?'· '+n.freeH.toFixed(1)+'h':''}</div></div>`;}
+  html+=`</div><p class="small muted" style="margin:.6rem 0 0">Juostoje: <span style="color:#5E7BB0">tamsa</span>, <span style="color:var(--good)">tamsa be Mėnulio</span>, <span style="color:var(--warn)">Mėnulis danguje</span>. Žalias langas — geriausias laikas deep sky.</p></div>`;
+  // 7 d. orų + tamsos suvestinė
+  html+=`<div class="card"><h2>Artimiausios 7 naktys <span class="sub">tamsa + orai</span></h2>`;
+  if(!App.weatherOK)html+=`<p class="muted small">Orų prognozė nepasiekiama — rodoma tik tamsos/Mėnulio analizė.</p>`;
+  for(let i=0;i<7;i++){
+    const n=nightFor(new Date(),i), w=App.weatherOK?Weather.nightAvg(n):null, sc=nightScore(n,w);
+    html+=`<div class="obj-row" onclick="openDay(${n.date.getTime()})">
+      <div class="obj-ico" style="color:${scoreColor(sc.v)}">${sc.v}</div>
+      <div class="obj-main"><div class="t">${n.date.toLocaleDateString('lt-LT',{weekday:'short',month:'2-digit',day:'2-digit'})}
+        <span class="badge ${CLSB[n.cls]}">${CLSLT[n.cls]}</span></div>
+      <div class="s">${moonEmoji(n.phase)} ${Math.round(n.illum*100)}% · ${n.darkStart?('tamsa '+fmtT(n.darkStart)+'–'+fmtT(n.darkEnd)):'be tamsos'}${w?` · ☁ ${Math.round(w.eff)}%`:''}</div></div>
+      ${w?`<div class="obj-side">${w.t.toFixed(0)}°C<br>rasa ${w.td.toFixed(0)}°</div>`:''}</div>`;}
+  html+=`</div>`;
+  v.innerHTML=html;}
+function calNav(d){App.calMonth.setMonth(App.calMonth.getMonth()+d);renderCal();}
+function openDay(ts){
+  const n=nightFor(new Date(ts),0), w=App.weatherOK?Weather.nightAvg(n):null, sc=nightScore(n,w);
+  let h=`<button class="x" onclick="closeModal()">✕</button><h2>${esc(fmtDL(n.date))}</h2>
+    <p><span class="badge ${CLSB[n.cls]}">${CLSLT[n.cls]}</span> &nbsp;Indeksas <b style="color:${scoreColor(sc.v)}">${sc.v}/10</b></p>
+    <div class="kv">
+      <b>Saulė</b><span>leidžiasi ${fmtT(n.sunset)}, teka ${fmtT(n.sunrise)}</span>
+      <b>${n.kind==='naut'?'Navigacinė tamsa':'Astronominė tamsa'}</b><span>${n.darkStart?fmtT(n.darkStart)+' – '+fmtT(n.darkEnd)+' ('+(n.darkH||0).toFixed(1)+' h)':'neprasideda (baltosios naktys)'}</span>
+      <b>Mėnulis</b><span>${moonEmoji(n.phase)} ${esc(moonPhaseName(n.phase))}, ${Math.round(n.illum*100)}% · teka ${fmtT(n.moonrise)}, leidžiasi ${fmtT(n.moonset)}</span>
+      <b>Be Mėnulio</b><span>${n.dim?'Mėnulis blyškus — visa tamsa tinkama':(n.freeWins.length?n.freeWins.map(x=>fmtT(new Date(x.a))+'–'+fmtT(new Date(x.b))).join(', ')+' ('+n.freeH.toFixed(1)+' h)':'nėra')}</span>`;
+  if(w)h+=`<b>Debesys (nakties vid.)</b><span>${Math.round(w.eff)}% (žemi ${Math.round(w.cl)} / vid. ${Math.round(w.cm)} / aukšti ${Math.round(w.ch)})</span>
+    <b>Oras</b><span>${w.t.toFixed(0)}°C, rasos t. ${w.td.toFixed(0)}°C, drėgnis ${Math.round(w.rh)}%, vėjas ${Math.round(w.ws)} km/h${w.aod!=null?', AOD '+w.aod.toFixed(2):''}</span>`;
+  h+=`</div>`;
+  const rl=recoList(n).slice(0,6);
+  if(rl.length){h+=`<hr class="hr"><p class="eyebrow">Geriausi objektai tą naktį</p>`+
+    rl.map(({o,t})=>`<div class="obj-row" onclick="openObj('${o.id}')"><div class="obj-ico">${esc(o.id.replace('NGC','N'))}</div>
+    <div class="obj-main"><div class="t">${esc(o.name||o.id)} ${t.peak?'<span class="badge b-gold">★ pikas</span>':''}</div>
+    <div class="s">${TYPES[o.type]} · maks. ${Math.round(t.maxAlt)}° ${fmtT(t.maxT)}</div></div></div>`).join('');}
+  openModal(h);}
+
+/* ============ KATALOGAS ============ */
+const Cat={q:'',type:'',con:'',season:'',mag:'',diff:'',watchOnly:false};
+function renderCat(){
+  const v=document.getElementById('v-cat');
+  const cons=[...new Set(DSO.map(o=>o.con))].sort((a,b)=>(CONLT[a]||a).localeCompare(CONLT[b]||b,'lt'));
+  let html=`<div class="card"><h2>Deep sky katalogas <span class="sub">Messier + populiarūs NGC</span></h2>
+  <input placeholder="Ieškoti (pvz., M31, Andromeda…)" value="${esc(Cat.q)}" oninput="Cat.q=this.value;renderCatList()">
+  <div class="filters">
+    <select onchange="Cat.type=this.value;renderCatList()"><option value="">Visi tipai</option>
+      ${Object.entries(TYPES).map(([k,n])=>`<option value="${k}" ${Cat.type===k?'selected':''}>${n}</option>`).join('')}</select>
+    <select onchange="Cat.con=this.value;renderCatList()"><option value="">Visi žvaigždynai</option>
+      ${cons.map(c=>`<option value="${c}" ${Cat.con===c?'selected':''}>${CONLT[c]||c}</option>`).join('')}</select>
+    <select onchange="Cat.season=this.value;renderCatList()"><option value="">Visi sezonai</option>
+      ${Object.entries(SEASONLT).map(([k,n])=>`<option value="${k}" ${Cat.season===k?'selected':''}>${n}</option>`).join('')}</select>
+    <select onchange="Cat.mag=this.value;renderCatList()"><option value="">Bet koks ryškis</option>
+      <option value="6" ${Cat.mag==='6'?'selected':''}>iki 6ᵐ (ryškūs)</option>
+      <option value="8" ${Cat.mag==='8'?'selected':''}>iki 8ᵐ</option>
+      <option value="10" ${Cat.mag==='10'?'selected':''}>iki 10ᵐ</option></select>
+    <select onchange="Cat.diff=this.value;renderCatList()"><option value="">Bet koks sudėtingumas</option>
+      <option value="1" ${Cat.diff==='1'?'selected':''}>Lengvi (žiūronai)</option>
+      <option value="2" ${Cat.diff==='2'?'selected':''}>Vidutiniai</option>
+      <option value="3" ${Cat.diff==='3'?'selected':''}>Sudėtingi</option></select>
+  </div>
+  <div class="chips"><button class="chip ${Cat.watchOnly?'on':''}" onclick="Cat.watchOnly=!Cat.watchOnly;renderCat()">⭑ Tik stebėjimo sąrašas</button>
+  <button class="chip" onclick="Cat.q='';Cat.type='';Cat.con='';Cat.season='';Cat.mag='';Cat.diff='';Cat.watchOnly=false;renderCat()">Išvalyti filtrus</button></div>
+  <div id="catList"></div></div>`;
+  v.innerHTML=html; renderCatList();}
+function renderCatList(){
+  const box=document.getElementById('catList'); if(!box)return;
+  const n=nightFor(new Date(), new Date().getHours()<12?-1:0);
+  const q=Cat.q.trim().toLowerCase();
+  let list=DSO.filter(o=>{
+    if(Cat.watchOnly&&!App.watch.includes(o.id))return false;
+    if(q&&!(o.id.toLowerCase().includes(q)||o.name.toLowerCase().includes(q)||(CONLT[o.con]||'').toLowerCase().includes(q)))return false;
+    if(Cat.type&&o.type!==Cat.type)return false;
+    if(Cat.con&&o.con!==Cat.con)return false;
+    if(Cat.season&&objSeason(o)!==Cat.season)return false;
+    if(Cat.mag&&o.mag>+Cat.mag)return false;
+    if(Cat.diff&&o.diff!==+Cat.diff)return false;
+    return true;});
+  list.sort((a,b)=>a.mag-b.mag);
+  box.innerHTML=list.length?list.map(o=>{
+    const w=App.watch.includes(o.id);
+    return `<div class="obj-row"><div class="obj-ico" onclick="openObj('${o.id}')">${esc(o.id.replace('NGC','N'))}</div>
+    <div class="obj-main" onclick="openObj('${o.id}')"><div class="t">${esc(o.name||o.id)}</div>
+    <div class="s">${TYPES[o.type]} · ${CONLT[o.con]||o.con} · ${o.mag}ᵐ · ${o.size}′ · ${SEASONLT[objSeason(o)]} · ${'●'.repeat(o.diff)}${'○'.repeat(3-o.diff)}</div></div>
+    <button class="btn sm" onclick="toggleWatch('${o.id}');this.textContent=App.watch.includes('${o.id}')?'⭑':'☆'">${w?'⭑':'☆'}</button></div>`;}).join('')
+    :'<p class="empty">Pagal filtrus objektų nerasta.</p>';}
+async function toggleWatch(id){
+  const i=App.watch.indexOf(id);
+  if(i>=0){App.watch.splice(i,1);toast('Pašalinta iš sąrašo');}
+  else{App.watch.push(id);toast('Pridėta į stebėjimo sąrašą ⭑');}
+  await Store.set('watch',App.watch);}
+
+/* ============ OBJEKTO KORTELĖ ============ */
+function raStr(ra){const h=ra*DEG/15;const H=Math.floor(h),M=Math.round((h-H)*60);return `${H}h ${String(M).padStart(2,'0')}m`;}
+function decStr(dec){const d=dec*DEG;const s=d<0?'−':'+';const a=Math.abs(d);return `${s}${Math.floor(a)}° ${String(Math.round((a%1)*60)).padStart(2,'0')}′`;}
+function openObj(id){
+  const o=DSOIDX[id]; if(!o)return;
+  const n=nightFor(new Date(), new Date().getHours()<12?-1:0);
+  const t=n.darkStart?objTonight(o,n):null;
+  const aa=altazFromRaDec(o.ra,o.dec,new Date(),App.loc.lat,App.loc.lon);
+  const w=App.watch.includes(id);
+  let h=`<button class="x" onclick="closeModal()">✕</button>
+  <p class="eyebrow">${TYPES[o.type]||o.type} · ${CONLT[o.con]||o.con}</p>
+  <h2>${esc(o.name||o.id)} <span class="muted" style="font-size:.9rem">${o.id}</span></h2>
+  <div class="kv">
+    <b>Ryškis</b><span>${o.mag}ᵐ</span>
+    <b>Kampinis dydis</b><span>${o.size}′</span>
+    <b>Koordinatės</b><span>RA ${raStr(o.ra)} · Dec ${decStr(o.dec)}</span>
+    <b>Sezonas</b><span>${SEASONLT[objSeason(o)]}</span>
+    <b>Sudėtingumas</b><span>${['','Lengvas — matomas žiūronais','Vidutinis — reikia teleskopo','Sudėtingas — tamsus dangus ir apertūra'][o.diff]}</span>
+    <b>Dabar</b><span>${aa.alt>0?Math.round(aa.alt*DEG)+'° aukštyje, azimutas '+Math.round(aa.az*DEG)+'°':'po horizontu'}</span>`;
+  if(t)h+=`<b>Šiąnakt</b><span>maks. ${Math.round(t.maxAlt)}° apie ${fmtT(t.maxT)}${t.peak?' · <span class="badge b-gold">★ metų pikas</span>':''}</span>
+    <b>Virš 20°</b><span>${fmtT(t.rise20)} – ${fmtT(t.set20)}</span>`;
+  h+=`</div><div class="btnrow">
+    <button class="btn" onclick="toggleWatch('${id}');closeModal()">${w?'☆ Išimti iš sąrašo':'⭑ Į stebėjimo sąrašą'}</button>
+    <button class="btn" onclick="locateObj('${id}')">⊕ Rodyti danguje</button>
+    <button class="btn primary" onclick="startEntry('${id}')">✎ Įrašyti stebėjimą</button></div>`;
+  const st=Journal.stats[id];
+  if(st)h+=`<hr class="hr"><p class="small muted">Jūsų istorija: stebėta ${st.n} k., paskutinį kartą ${new Date(st.last).toLocaleDateString('lt-LT')}, vid. įvertinimas ${st.avg.toFixed(1)} ★</p>`;
+  openModal(h);}
+function openPlanet(pid){
+  const p=PLANETS.find(x=>x.id===pid); const now=new Date();
+  const pos=planetRaDec(p,now), aa=altazFromRaDec(pos.ra,pos.dec,now,App.loc.lat,App.loc.lon);
+  openModal(`<button class="x" onclick="closeModal()">✕</button><p class="eyebrow">Saulės sistemos planeta</p>
+  <h2>${p.name}</h2><div class="kv">
+  <b>Ryškis</b><span>${pos.mag.toFixed(1)}ᵐ</span>
+  <b>Atstumas</b><span>${pos.dist.toFixed(2)} AV</span>
+  <b>Koordinatės</b><span>RA ${raStr(pos.ra)} · Dec ${decStr(pos.dec)}</span>
+  <b>Dabar</b><span>${aa.alt>0?Math.round(aa.alt*DEG)+'° aukštyje, az. '+Math.round(aa.az*DEG)+'°':'po horizontu'}</span></div>
+  <div class="btnrow"><button class="btn" onclick="locatePlanet('${pid}')">⊕ Rodyti danguje</button>
+  <button class="btn primary" onclick="startEntry('PL:${pid}')">✎ Įrašyti stebėjimą</button></div>`);}
+function openModal(html){const m=document.getElementById('modal');document.getElementById('sheet').innerHTML=html;m.classList.add('act');}
+function closeModal(){document.getElementById('modal').classList.remove('act');}
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+
+/* ============ ŽVAIGŽDĖLAPIS ============ */
+const Sky={stars:null,lines:null,names:null,offMin:0,zoom:1,rot:0,highlight:null,hits:[],loaded:false,raf:0,
+  start(){ loadSkyData().then(()=>drawSky()); drawSky();
+    clearInterval(this._iv); this._iv=setInterval(()=>{
+      if(document.getElementById('v-sky').classList.contains('act'))drawSky();},60000);},
+  stop(){ clearInterval(this._iv); this._iv=null; }};
+async function loadSkyData(){
+  if(Sky.loaded)return;
+  const msg=document.getElementById('skymsg');
+  msg.style.display='block'; msg.textContent='Kraunamas žvaigždžių katalogas…';
+  const SRC='https://raw.githubusercontent.com/ofrohn/d3-celestial/master/data/';
+  try{
+    const sf=App.settings.stars8?'stars.8.json':'stars.6.json';
+    const [s,l,nm]=await Promise.all([
+      fetch(SRC+sf).then(r=>r.json()),
+      fetch(SRC+'constellations.lines.json').then(r=>r.json()),
+      fetch(SRC+'constellations.json').then(r=>r.json())]);
+    Sky.stars=s.features.map(f=>{const[lo,la]=f.geometry.coordinates;
+      return {ra:(lo<0?lo+360:lo)*RAD,dec:la*RAD,mag:f.properties.mag};});
+    Sky.lines=l.features.map(f=>({id:f.id,seg:f.geometry.coordinates.map(line=>line.map(([lo,la])=>[(lo<0?lo+360:lo)*RAD,la*RAD]))}));
+    Sky.names=nm.features.map(f=>{const[lo,la]=f.geometry.coordinates;
+      return {id:f.id,ra:(lo<0?lo+360:lo)*RAD,dec:la*RAD};});
+    Sky.loaded=true; msg.style.display='none';
+  }catch(e){msg.textContent='Nepavyko atsisiųsti žvaigždžių katalogo (reikia interneto; Claude peržiūroje gali būti blokuojama). Rodomi tik deep sky objektai, planetos ir Mėnulis.';}
+  drawSky();}
+function skyDate(){return new Date(Date.now()+Sky.offMin*60000);}
+function project(alt,az,W,H,R){
+  if(alt<-0.02)return null;
+  const rho=R*Math.cos(alt)/(1+Math.sin(Math.max(0,alt)));
+  const a=az+Sky.rot;
+  return [W/2+rho*Math.sin(a), H/2-(-rho*Math.cos(a))*-1]; }
+function drawSky(){
+  const cv=document.getElementById('sky'), wrap=document.getElementById('skywrap');
+  const Wc=wrap.clientWidth, Hc=Math.min(Wc, window.innerHeight-230);
+  const dpr=window.devicePixelRatio||1;
+  cv.width=Wc*dpr; cv.height=Hc*dpr; cv.style.height=Hc+'px';
+  const x=cv.getContext('2d'); x.scale(dpr,dpr);
+  const W=Wc,H=Hc, R=Math.min(W,H)/2*0.94*Sky.zoom;
+  const t=skyDate(), lat=App.loc.lat, lon=App.loc.lon;
+  document.getElementById('skytime').textContent=t.toLocaleTimeString('lt-LT',{hour:'2-digit',minute:'2-digit'})+(Sky.offMin?` (${Sky.offMin>0?'+':''}${Math.round(Sky.offMin/60*10)/10}h)`:'');
+  const sa=sunAlt(t,lat,lon)*DEG;
+  x.fillStyle=sa>-6?'#15203A':sa>-12?'#0B1226':sa>-18?'#070C19':'#04060D';
+  x.fillRect(0,0,W,H);
+  const P=(ra,dec)=>{const{alt,az}=altazFromRaDec(ra,dec,t,lat,lon);
+    if(alt<-0.02)return null;
+    const rho=R*Math.cos(alt)/(1+Math.sin(alt));
+    const a=az+Sky.rot;
+    return [W/2+rho*Math.sin(a),H/2-rho*Math.cos(a),alt];};
+  // horizontas
+  x.beginPath();x.arc(W/2,H/2,R,0,TAU);x.strokeStyle='#2A3B61';x.lineWidth=1.5;x.stroke();
+  x.save();x.beginPath();x.arc(W/2,H/2,R+1,0,TAU);x.clip();
+  // aukščio apskritimai 30/60
+  for(const al of [30,60]){const rho=R*Math.cos(al*RAD)/(1+Math.sin(al*RAD));
+    x.beginPath();x.arc(W/2,H/2,rho,0,TAU);x.strokeStyle='rgba(42,59,97,.4)';x.lineWidth=.7;x.stroke();}
+  // žvaigždynų linijos
+  if(Sky.lines){x.strokeStyle='rgba(122,150,205,.34)';x.lineWidth=1;
+    for(const c of Sky.lines)for(const seg of c.seg){let started=false;x.beginPath();
+      for(const[ra,dec]of seg){const p=P(ra,dec);
+        if(!p){started=false;continue;}
+        if(!started){x.moveTo(p[0],p[1]);started=true;}else x.lineTo(p[0],p[1]);}
+      x.stroke();}}
+  // ekliptika
+  x.strokeStyle='rgba(242,200,121,.3)';x.lineWidth=.8;x.beginPath();let st=false;
+  for(let L=0;L<=360;L+=4){const q=eclToEq(L*RAD,0);const p=P(q.ra,q.dec);
+    if(!p){st=false;continue;} if(!st){x.moveTo(p[0],p[1]);st=true;}else x.lineTo(p[0],p[1]);}
+  x.stroke();
+  // žvaigždės
+  if(Sky.stars){for(const s of Sky.stars){const p=P(s.ra,s.dec);if(!p)continue;
+    const r=Math.max(.4,(3.4-0.42*s.mag)*Math.sqrt(Sky.zoom));
+    if(r<.45&&s.mag>5.6)continue;
+    x.beginPath();x.arc(p[0],p[1],r,0,TAU);x.fillStyle=s.mag<2?'#F4F6FF':'#C9D4F0';x.fill();}}
+  Sky.hits=[];
+  // DSO
+  for(const o of DSO){const p=P(o.ra,o.dec);if(!p)continue;
+    const col=o.type==='GX'?'#E08AC0':o.type==='GC'?'#F2C879':(o.type==='OC'||o.type==='AST'||o.type==='SC')?'#8FB8E8':'#7BD9C0';
+    x.strokeStyle=col;x.lineWidth=1.2;x.beginPath();
+    if(o.type==='GX'){x.ellipse(p[0],p[1],5,2.6,.6,0,TAU);}else
+    if(o.type==='OC'||o.type==='AST'||o.type==='SC'){x.rect(p[0]-4,p[1]-4,8,8);}else
+    {x.arc(p[0],p[1],4,0,TAU);}
+    x.stroke();
+    Sky.hits.push({x:p[0],y:p[1],id:o.id,kind:'dso'});
+    if(o.mag<6.5||Sky.zoom>1.7||App.watch.includes(o.id)){x.fillStyle=col;x.font='10px IBM Plex Sans';
+      x.fillText(o.id,p[0]+6,p[1]-5);}}
+  // planetos
+  for(const pl of PLANETS){const c=planetRaDec(pl,t);const p=P(c.ra,c.dec);if(!p)continue;
+    x.fillStyle='#FFE9A8';x.beginPath();x.arc(p[0],p[1],4.5,0,TAU);x.fill();
+    x.font='11px Space Grotesk';x.fillText(pl.name,p[0]+7,p[1]+4);
+    Sky.hits.push({x:p[0],y:p[1],id:pl.id,kind:'pl'});}
+  // Mėnulis
+  {const md=moonCoords(toDays(t));const p=P(md.ra,md.dec);
+   if(p){const il=moonIllum(t);x.fillStyle='#EDEFF6';x.beginPath();x.arc(p[0],p[1],8,0,TAU);x.fill();
+     x.fillStyle='#04060D';x.font='12px sans-serif';
+     x.fillStyle='#9AA6C8';x.font='11px Space Grotesk';x.fillText('Mėnulis '+Math.round(il.fraction*100)+'%',p[0]+11,p[1]+4);}}
+  // žvaigždynų pavadinimai
+  if(Sky.names){x.fillStyle='rgba(148,161,195,.55)';x.font='10px Space Grotesk';x.textAlign='center';
+    for(const nm of Sky.names){const p=P(nm.ra,nm.dec);if(!p||p[2]<0.07)continue;
+      x.fillText((CONLT[nm.id]||nm.id).toUpperCase(),p[0],p[1]);}
+    x.textAlign='left';}
+  // paryškintas objektas
+  if(Sky.highlight){const o=Sky.highlight.kind==='dso'?DSOIDX[Sky.highlight.id]:null;
+    let p=null;
+    if(o)p=P(o.ra,o.dec);
+    else{const pl=PLANETS.find(q=>q.id===Sky.highlight.id);if(pl){const c=planetRaDec(pl,t);p=P(c.ra,c.dec);}}
+    if(p){const ph=(Date.now()/600)%1;
+      x.strokeStyle='var(--gold)';x.strokeStyle='#F2C879';x.lineWidth=2;
+      x.beginPath();x.arc(p[0],p[1],12+ph*6,0,TAU);x.globalAlpha=1-ph*.7;x.stroke();x.globalAlpha=1;
+      cancelAnimationFrame(Sky.raf);Sky.raf=requestAnimationFrame(()=>drawSky());}}
+  x.restore();
+  // kryptys
+  x.fillStyle='#94A1C3';x.font='12px Space Grotesk';x.textAlign='center';
+  const dirs=[['Š',0],['R',90],['P',180],['V',270]];
+  for(const[d,az]of dirs){const a=az*RAD+Sky.rot;
+    x.fillText(d,W/2+(R+12)*Math.sin(a),H/2-(R+12)*Math.cos(a)+4);}
+  x.textAlign='left';}
+function locateObj(id){Sky.highlight={id,kind:'dso'};switchTab('v-sky');
+  const o=DSOIDX[id];const aa=altazFromRaDec(o.ra,o.dec,skyDate(),App.loc.lat,App.loc.lon);
+  if(aa.alt<=0){const n=nightFor(new Date(),0);
+    const f=t=>altazFromRaDec(o.ra,o.dec,t,App.loc.lat,App.loc.lon).alt*DEG;
+    const c=crossings(new Date(),new Date(Date.now()+DAYMS),10,f,0);
+    toast(`${o.id} dabar po horizontu${c.ups[0]?', pateka ~'+fmtT(c.ups[0]):''}`);}
+  else toast(`${o.id}: ${Math.round(aa.alt*DEG)}° aukštyje, azimutas ${Math.round(aa.az*DEG)}° (${azName(aa.az)})`);
+  closeModal();drawSky();}
+function locatePlanet(id){Sky.highlight={id,kind:'pl'};switchTab('v-sky');closeModal();drawSky();}
+function azName(az){const d=az*DEG;const n=['Š','ŠR','R','PR','P','PV','V','ŠV'];return n[Math.round(d/45)%8];}
+/* lietimas */
+(()=>{const cv=document.getElementById('sky');let drag=null,pinch=null,moved=false;
+  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);
+    if(drag&&drag.id!==e.pointerId){pinch={a:drag,b:{id:e.pointerId,x:e.offsetX,y:e.offsetY},z:Sky.zoom};}
+    else drag={id:e.pointerId,x:e.offsetX,y:e.offsetY,rot:Sky.rot};moved=false;});
+  cv.addEventListener('pointermove',e=>{
+    if(pinch){const p=e.pointerId===pinch.a.id?pinch.a:pinch.b;p.x=e.offsetX;p.y=e.offsetY;
+      const d=Math.hypot(pinch.a.x-pinch.b.x,pinch.a.y-pinch.b.y);
+      if(!pinch.d0)pinch.d0=d;else{Sky.zoom=Math.max(.7,Math.min(4,pinch.z*d/pinch.d0));drawSky();}moved=true;return;}
+    if(drag&&e.pointerId===drag.id){const dx=e.offsetX-drag.x;
+      if(Math.abs(dx)>4)moved=true;
+      Sky.rot=drag.rot+dx*0.006;drawSky();}});
+  const up=e=>{if(!moved&&drag){const mx=e.offsetX,my=e.offsetY;let best=null,bd=20*20;
+      for(const h of Sky.hits){const d=(h.x-mx)**2+(h.y-my)**2;if(d<bd){bd=d;best=h;}}
+      if(best){best.kind==='dso'?openObj(best.id):openPlanet(best.id);}}
+    drag=null;pinch=null;};
+  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',()=>{drag=null;pinch=null;});
+  cv.addEventListener('wheel',e=>{e.preventDefault();Sky.zoom=Math.max(.7,Math.min(4,Sky.zoom*(e.deltaY<0?1.12:0.89)));drawSky();},{passive:false});
+  document.getElementById('skySlider').addEventListener('input',e=>{Sky.offMin=+e.target.value;drawSky();});
+  document.getElementById('skyNow').addEventListener('click',()=>{Sky.offMin=0;document.getElementById('skySlider').value=0;drawSky();});
+  window.addEventListener('resize',()=>{if(document.getElementById('v-sky').classList.contains('act'))drawSky();});
+})();
+
+/* ============ ŽURNALAS (sesijos + įrašai) ============ */
+const Journal={
+  sessions:[], stats:{}, loaded:false,
+  async load(){ if(this.loaded)return;
+    const keys=await Store.list('sessions:');
+    const out=[];
+    for(const k of keys){const s=await Store.get(k);if(s)out.push(s);}
+    out.sort((a,b)=>new Date(b.start)-new Date(a.start));
+    this.sessions=out; this.rebuild(); this.loaded=true;},
+  rebuild(){ const st={};
+    for(const s of this.sessions)for(const e of (s.entries||[])){
+      const o=st[e.obj]||(st[e.obj]={n:0,sum:0,nr:0,last:0});
+      o.n++; if(e.rating){o.sum+=e.rating;o.nr++;}
+      const t=new Date(e.time).getTime(); if(t>o.last)o.last=t;}
+    for(const k in st)st[k].avg=st[k].nr?st[k].sum/st[k].nr:0;
+    this.stats=st;},
+  async save(s){ await Store.set('sessions:'+s.id,s); this.rebuild(); }
+};
+function objName(id){
+  if(id.startsWith('PL:')){const p=PLANETS.find(x=>x.id===id.slice(3));return p?p.name:id;}
+  const o=DSOIDX[id]; return o?(o.id+' — '+o.name):id;}
+
+/* ---- sesijos srautas ---- */
+async function startSession(){
+  if(App.session){toast('Sesija jau vyksta');return;}
+  openModal(`<button class="x" onclick="closeModal()">✕</button>
+    <p class="eyebrow">Nauja stebėjimo sesija</p><h2>Pradėti stebėjimą</h2>
+    <p class="small muted" id="ssGps">Nustatoma GPS padėtis…</p>
+    <div class="kv" id="ssMeta"></div>
+    <div class="btnrow"><button class="btn primary" id="ssGo" disabled>▶ Pradėti sesiją</button></div>`);
+  let lat=App.loc.lat,lon=App.loc.lon,name=App.loc.name,gps=false;
+  const fill=()=>{
+    const w=App.weatherOK?Weather.at(new Date()):null;
+    document.getElementById('ssGps').textContent=gps
+      ?`GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}`
+      :`GPS nepasiekiamas — naudojama įrašyta vieta (${name})`;
+    document.getElementById('ssMeta').innerHTML=`
+      <b>Laikas</b><span>${new Date().toLocaleString('lt-LT')}</span>
+      <b>Vieta</b><span>${name} · ${lat.toFixed(3)}, ${lon.toFixed(3)}</span>
+      <b>Bortle</b><span>${App.loc.bortle} — ${BORTLE[App.loc.bortle]}</span>
+      <b>Oras</b><span>${w?`${fmtN(w.t)}°C, rasos t. ${fmtN(w.td)}°C, debesys ${Math.round(w.cc)}%, vėjas ${Math.round(w.ws)} km/h`:'nėra duomenų'}</span>`;
+    const b=document.getElementById('ssGo'); b.disabled=false;
+    b.onclick=async()=>{
+      const w2=App.weatherOK?Weather.at(new Date()):null;
+      App.session={id:'s'+Date.now(),start:new Date().toISOString(),end:null,
+        lat,lon,place:name,bortle:App.loc.bortle,
+        weather:w2?{t:w2.t,td:w2.td,rh:w2.rh,cc:w2.cc,cl:w2.cl,cm:w2.cm,ch:w2.ch,ws:w2.ws}:null,
+        entries:[]};
+      await Journal.save(App.session);
+      if(gps&&(Math.abs(lat-App.loc.lat)>0.02||Math.abs(lon-App.loc.lon)>0.02)){
+        App.loc={...App.loc,lat,lon}; App.nightsCache={}; saveAll(); initWeather(true);}
+      closeModal(); updateSessBanner(); switchTab('v-log'); toast('Sesija pradėta — giedro dangaus!');};
+  };
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(p=>{
+      lat=p.coords.latitude;lon=p.coords.longitude;gps=true;
+      name=App.loc.name+' (GPS)'; fill();
+    },()=>fill(),{enableHighAccuracy:true,timeout:8000});
+    setTimeout(()=>{if(document.getElementById('ssGo')&&document.getElementById('ssGo').disabled)fill();},8500);
+  } else fill();}
+
+async function endSession(){
+  if(!App.session)return;
+  const s=App.session; s.end=new Date().toISOString();
+  await Journal.save(s);
+  if(!Journal.sessions.find(x=>x.id===s.id))Journal.sessions.unshift(s);
+  App.session=null; updateSessBanner();
+  const dur=Math.round((new Date(s.end)-new Date(s.start))/60000);
+  openModal(`<button class="x" onclick="closeModal()">✕</button>
+    <p class="eyebrow">Sesija baigta</p><h2>Vakaro suvestinė</h2>
+    <div class="kv">
+      <b>Trukmė</b><span>${Math.floor(dur/60)} val. ${dur%60} min.</span>
+      <b>Vieta</b><span>${esc(s.place)}</span>
+      <b>Objektų įrašyta</b><span>${s.entries.length}</span>
+      ${s.entries.length?`<b>Objektai</b><span>${s.entries.map(e=>esc(objName(e.obj).split(' — ')[0])).join(', ')}</span>`:''}
+    </div>
+    <div class="btnrow"><button class="btn primary" onclick="closeModal();switchTab('v-log')">Žiūrėti žurnalą</button></div>`);
+  renderLog();}
+
+function updateSessBanner(){
+  const b=document.getElementById('sessBanner');
+  if(App.session){b.classList.add('act');
+    const n=App.session.entries.length;
+    document.getElementById('sessInfo').textContent=
+      `Sesija nuo ${fmtT(new Date(App.session.start))} · ${n} įraš${n===1?'as':(n%10>=2&&n%10<=9&&(n%100<11||n%100>19)?'ai':'ų')}`;
+  } else b.classList.remove('act');}
+
+/* ---- objekto įrašas ---- */
+let _entry=null;
+function startEntry(id){
+  if(!App.session){
+    openModal(`<button class="x" onclick="closeModal()">✕</button><h2>Sesija nepradėta</h2>
+      <p class="muted">Stebėjimo įrašai pridedami prie aktyvios sesijos — taip automatiškai užfiksuojama vieta, laikas ir oro sąlygos.</p>
+      <div class="btnrow"><button class="btn primary" onclick="closeModal();startSession()">▶ Pradėti sesiją</button></div>`);
+    return;}
+  const now=new Date(); const w=App.weatherOK?Weather.at(now):null;
+  _entry={obj:id,time:now.toISOString(),rating:0,photo:null};
+  let desc='';
+  if(id.startsWith('PL:')){const p=PLANETS.find(x=>x.id===id.slice(3));
+    if(p){const pos=planetRaDec(p,now),aa=altazFromRaDec(pos.ra,pos.dec,now,App.session.lat,App.session.lon);
+      desc=`Planeta · ${pos.mag.toFixed(1)}ᵐ · ${aa.alt>0?Math.round(aa.alt*DEG)+'° aukštyje ('+azName(aa.az)+')':'po horizontu'}`;}}
+  else{const o=DSOIDX[id];
+    if(o){const aa=altazFromRaDec(o.ra,o.dec,now,App.session.lat,App.session.lon);
+      desc=`${TYPES[o.type]||o.type} · ${CONLT[o.con]||o.con} · ${o.mag}ᵐ · ${o.size}′ · ${aa.alt>0?Math.round(aa.alt*DEG)+'° aukštyje ('+azName(aa.az)+')':'po horizontu'}`;}}
+  openModal(`<button class="x" onclick="closeModal()">✕</button>
+    <p class="eyebrow">Stebėjimo įrašas</p><h2>${esc(objName(id))}</h2>
+    <p class="small muted">${esc(desc)}</p>
+    <div class="kv">
+      <b>Laikas</b><span>${now.toLocaleString('lt-LT')}</span>
+      <b>Vieta</b><span>${esc(App.session.place)} · Bortle ${App.session.bortle}</span>
+      <b>Oras</b><span>${w?`${fmtN(w.t)}°C, debesys ${Math.round(w.cc)}%, RH ${Math.round(w.rh)}%`:(App.session.weather?`${fmtN(App.session.weather.t)}°C (sesijos pradžioje)`:'—')}</span>
+    </div>
+    <label class="small muted" style="display:block;margin-top:.6rem">Instrumentas / okuliaras</label>
+    <input class="inp" id="enInstr" placeholder="pvz., 8&quot; Dobsonas, 25 mm okuliaras" value="${esc(App.settings.lastInstr||'')}">
+    <label class="small muted" style="display:block;margin-top:.6rem">Pastabos ir įžvalgos</label>
+    <textarea class="inp" id="enNotes" rows="4" placeholder="Ką matėte? Detalės, forma, spalva, palydovai…"></textarea>
+    <label class="small muted" style="display:block;margin-top:.6rem">Įvertinimas</label>
+    <div class="stars" id="enStars">${[1,2,3,4,5].map(i=>`<span data-r="${i}">☆</span>`).join('')}</div>
+    <label class="small muted" style="display:block;margin-top:.6rem">Nuotrauka (nebūtina)</label>
+    <input type="file" id="enPhoto" accept="image/*" class="inp">
+    <div id="enPrev" style="margin-top:.5rem"></div>
+    <div class="btnrow"><button class="btn" onclick="closeModal()">Atšaukti</button>
+    <button class="btn primary" onclick="saveEntry()">💾 Išsaugoti įrašą</button></div>`);
+  document.getElementById('enStars').addEventListener('click',e=>{
+    const r=+e.target.dataset.r; if(!r)return; _entry.rating=r;
+    document.querySelectorAll('#enStars span').forEach(s=>s.textContent=+s.dataset.r<=r?'★':'☆');});
+  document.getElementById('enPhoto').addEventListener('change',e=>{
+    const f=e.target.files[0]; if(!f)return;
+    const img=new Image(); img.onload=()=>{
+      const cv=document.createElement('canvas'); const sc=Math.min(1,1000/Math.max(img.width,img.height));
+      cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      _entry.photo=cv.toDataURL('image/jpeg',0.75);
+      document.getElementById('enPrev').innerHTML=`<img src="${_entry.photo}" style="max-width:100%;border-radius:10px">`;
+      URL.revokeObjectURL(img.src);};
+    img.src=URL.createObjectURL(f);});}
+
+async function saveEntry(){
+  if(!App.session||!_entry)return;
+  _entry.instr=document.getElementById('enInstr').value.trim();
+  _entry.notes=document.getElementById('enNotes').value.trim();
+  if(_entry.instr){App.settings.lastInstr=_entry.instr;saveAll();}
+  App.session.entries.push(_entry);
+  const ok=await Journal.save(App.session);
+  if(ok===false&&_entry.photo){ // per didelė nuotrauka saugyklai
+    _entry.photo=null; await Journal.save(App.session);
+    toast('Įrašas išsaugotas, bet nuotrauka netilpo į saugyklą');}
+  else toast('Įrašas išsaugotas ✓');
+  _entry=null; closeModal(); updateSessBanner();
+  if(document.getElementById('v-log').classList.contains('act'))renderLog();}
+
+/* ---- žurnalo vaizdas ---- */
+async function renderLog(){
+  await Journal.load();
+  const el=document.getElementById('v-log'); let h='';
+  if(App.session){
+    const s=App.session;
+    h+=`<div class="card" style="border-color:rgba(242,200,121,.45)">
+      <p class="eyebrow">● Vyksta sesija</p>
+      <h2>Nuo ${fmtT(new Date(s.start))} · ${esc(s.place)}</h2>
+      <p class="small muted">Bortle ${s.bortle}${s.weather?` · ${fmtN(s.weather.t)}°C, debesys ${Math.round(s.weather.cc)}%`:''}</p>`;
+    if(s.entries.length){h+=`<hr class="hr">`;
+      for(const e of s.entries)h+=entryRow(e);}
+    h+=`<div class="btnrow"><button class="btn" onclick="switchTab('v-cat')">+ Objektas iš katalogo</button>
+      <button class="btn primary" onclick="endSession()">⏹ Baigti sesiją</button></div></div>`;
+  } else {
+    h+=`<div class="card"><h2>Stebėjimų žurnalas</h2>
+      <p class="muted small">Pradėjus sesiją automatiškai užfiksuojama GPS vieta, laikas, oro sąlygos ir Bortle klasė. Tuomet iš katalogo ar žvaigždėlapio spauskite „Įrašyti stebėjimą".</p>
+      <div class="btnrow"><button class="btn primary" onclick="startSession()">▶ Pradėti sesiją</button></div></div>`;}
+  /* mano objektai */
+  const ids=Object.keys(Journal.stats);
+  h+=`<div class="card"><h2>Mano stebėti objektai <span class="sub">${ids.length}</span></h2>`;
+  if(!ids.length)h+=`<p class="muted small">Kol kas tuščia — pirmieji įrašai atsiras čia.</p>`;
+  else{
+    ids.sort((a,b)=>Journal.stats[b].last-Journal.stats[a].last);
+    for(const id of ids){const st=Journal.stats[id];
+      h+=`<div class="obj-row" onclick="${id.startsWith('PL:')?`openPlanet('${id.slice(3)}')`:`openObj('${id}')`}">
+        <div class="t">${esc(objName(id))}</div>
+        <div class="s">${st.n} k. · pask. ${new Date(st.last).toLocaleDateString('lt-LT')}${st.nr?` · vid. ${st.avg.toFixed(1)} ★`:''}</div></div>`;}}
+  h+=`</div>`;
+  /* sesijų istorija */
+  const past=Journal.sessions.filter(s=>!(App.session&&s.id===App.session.id));
+  h+=`<div class="card"><h2>Sesijų istorija <span class="sub">${past.length}</span></h2>`;
+  if(!past.length)h+=`<p class="muted small">Užbaigtos sesijos bus rodomos čia.</p>`;
+  else for(const s of past){
+    const d=new Date(s.start);
+    const dur=s.end?Math.round((new Date(s.end)-d)/60000):null;
+    h+=`<div class="obj-row" onclick="openSession('${s.id}')">
+      <div class="t">${d.toLocaleDateString('lt-LT')} · ${esc(s.place)}</div>
+      <div class="s">${fmtT(d)}${s.end?'–'+fmtT(new Date(s.end)):''}${dur!=null?` (${Math.floor(dur/60)}v ${dur%60}m)`:''} · ${s.entries.length} obj. · Bortle ${s.bortle}</div></div>`;}
+  h+=`</div>`;
+  el.innerHTML=h;}
+
+function entryRow(e){
+  return `<div style="padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,.06)">
+    <div style="display:flex;justify-content:space-between;gap:.5rem">
+      <b>${esc(objName(e.obj))}</b><span class="small muted">${fmtT(new Date(e.time))}</span></div>
+    ${e.rating?`<div class="small" style="color:var(--gold)">${'★'.repeat(e.rating)}${'☆'.repeat(5-e.rating)}</div>`:''}
+    ${e.instr?`<div class="small muted">${esc(e.instr)}</div>`:''}
+    ${e.notes?`<div class="small" style="margin-top:.15rem">${esc(e.notes)}</div>`:''}
+    ${e.photo?`<img src="${e.photo}" style="max-width:100%;border-radius:10px;margin-top:.4rem">`:''}</div>`;}
+
+function openSession(id){
+  const s=Journal.sessions.find(x=>x.id===id); if(!s)return;
+  const d=new Date(s.start);
+  let h=`<button class="x" onclick="closeModal()">✕</button>
+    <p class="eyebrow">Sesija</p><h2>${d.toLocaleDateString('lt-LT')} · ${esc(s.place)}</h2>
+    <div class="kv">
+      <b>Laikas</b><span>${fmtT(d)}${s.end?' – '+fmtT(new Date(s.end)):''}</span>
+      <b>Vieta</b><span>${s.lat.toFixed(3)}, ${s.lon.toFixed(3)}</span>
+      <b>Bortle</b><span>${s.bortle} — ${BORTLE[s.bortle]}</span>
+      ${s.weather?`<b>Oras</b><span>${fmtN(s.weather.t)}°C, rasos t. ${fmtN(s.weather.td)}°C, debesys ${Math.round(s.weather.cc)}%, vėjas ${Math.round(s.weather.ws)} km/h</span>`:''}
+    </div>`;
+  if(s.entries.length){h+=`<hr class="hr">`;for(const e of s.entries)h+=entryRow(e);}
+  else h+=`<p class="muted small" style="margin-top:.6rem">Įrašų nėra.</p>`;
+  h+=`<div class="btnrow"><button class="btn" onclick="deleteSession('${s.id}')">🗑 Ištrinti</button></div>`;
+  openModal(h);}
+
+async function deleteSession(id){
+  if(!confirm('Ištrinti šią sesiją ir visus jos įrašus?'))return;
+  await Store.del('sessions:'+id);
+  Journal.sessions=Journal.sessions.filter(s=>s.id!==id);
+  Journal.rebuild(); closeModal(); renderLog(); toast('Sesija ištrinta');}
+
+/* ============ NUSTATYMAI ============ */
+function openSettings(){
+  openModal(`<button class="x" onclick="closeModal()">✕</button>
+    <p class="eyebrow">Nustatymai</p><h2>Vieta ir programa</h2>
+    <label class="small muted">Vietos pavadinimas</label>
+    <input class="inp" id="stName" value="${esc(App.loc.name)}">
+    <div style="display:flex;gap:.5rem">
+      <div style="flex:1"><label class="small muted">Platuma</label>
+        <input class="inp" id="stLat" type="number" step="0.0001" value="${App.loc.lat}"></div>
+      <div style="flex:1"><label class="small muted">Ilguma</label>
+        <input class="inp" id="stLon" type="number" step="0.0001" value="${App.loc.lon}"></div>
+    </div>
+    <div class="btnrow" style="margin:.5rem 0 .8rem">
+      <button class="btn sm" id="stGps">📍 Nustatyti pagal GPS</button>
+    </div>
+    <label class="small muted">Dangaus tamsumas (Bortle klasė)</label>
+    <select class="inp" id="stBortle">${[1,2,3,4,5,6,7,8,9].map(b=>
+      `<option value="${b}" ${b===App.loc.bortle?'selected':''}>${b} — ${BORTLE[b]}</option>`).join('')}</select>
+    <hr class="hr">
+    <label style="display:flex;align-items:center;gap:.6rem;font-size:.88rem;margin:.4rem 0">
+      <input type="checkbox" id="stNotif" ${App.settings.notif?'checked':''} style="width:auto">
+      Pranešimas apie tinkamą rytojaus naktį (atidarius programą)</label>
+    <label style="display:flex;align-items:center;gap:.6rem;font-size:.88rem;margin:.4rem 0">
+      <input type="checkbox" id="stStars8" ${App.settings.stars8?'checked':''} style="width:auto">
+      Daugiau žvaigždžių žemėlapyje (iki ~8.5ᵐ; lėtesnis krovimas)</label>
+    <p class="small muted" style="margin-top:.6rem">Duomenų saugykla: ${
+      {cloud:'Claude saugykla (sinchronizuojama)',local:'naršyklės localStorage (šiame įrenginyje)',mem:'tik atmintis — uždarius prarandama!'}[Store.mode]}</p>
+    <div class="btnrow"><button class="btn primary" id="stSave">💾 Išsaugoti</button></div>`);
+  document.getElementById('stGps').onclick=()=>{
+    if(!navigator.geolocation){toast('GPS nepasiekiamas šioje naršyklėje');return;}
+    toast('Nustatoma padėtis…');
+    navigator.geolocation.getCurrentPosition(p=>{
+      document.getElementById('stLat').value=p.coords.latitude.toFixed(4);
+      document.getElementById('stLon').value=p.coords.longitude.toFixed(4);
+      toast('GPS padėtis nustatyta ✓');
+    },()=>toast('Nepavyko gauti GPS — įveskite ranka'),{enableHighAccuracy:true,timeout:9000});};
+  document.getElementById('stSave').onclick=async()=>{
+    const lat=parseFloat(document.getElementById('stLat').value),
+          lon=parseFloat(document.getElementById('stLon').value);
+    if(isNaN(lat)||isNaN(lon)||Math.abs(lat)>89||Math.abs(lon)>180){toast('Neteisingos koordinatės');return;}
+    const wantNotif=document.getElementById('stNotif').checked;
+    if(wantNotif&&!App.settings.notif)await enableNotif();
+    else App.settings.notif=wantNotif;
+    const s8=document.getElementById('stStars8').checked;
+    if(s8!==App.settings.stars8){App.settings.stars8=s8;Sky.stars=null;Sky.loaded=false;}
+    App.loc={name:document.getElementById('stName').value.trim()||'Mano vieta',
+      lat,lon,bortle:+document.getElementById('stBortle').value};
+    App.nightsCache={};
+    document.getElementById('locName').textContent=App.loc.name;
+    await saveAll(); closeModal(); toast('Išsaugota ✓');
+    renderTonight(); initWeather(true);};}
+
+async function enableNotif(){
+  if(!('Notification' in window)){toast('Naršyklė nepalaiko pranešimų');App.settings.notif=false;return;}
+  const p=await Notification.requestPermission();
+  App.settings.notif=(p==='granted');
+  if(p!=='granted')toast('Pranešimai neleisti naršyklės nustatymuose');}
+
+function checkTomorrowNotif(){
+  if(!App.settings.notif||!('Notification' in window)||Notification.permission!=='granted')return;
+  if(!App.weatherOK)return;
+  const n=nightFor(new Date(),1);
+  const key=new Date(Date.now()+DAYMS).toDateString();
+  if(App.settings.lastNotif===key)return;
+  const w=Weather.nightAvg(n);
+  const sc=nightScore(n,w);
+  let body;
+  if(sc.v>=7)body=`Rytojaus naktis puiki stebėjimams — indeksas ${sc.v}/10. ${n.cls==='ideal'?'Mėnulis netrukdys.':''}`;
+  else if(sc.v>=5)body=`Rytojaus naktis vidutiniška (${sc.v}/10) — pasitikrinkite laiko langus.`;
+  else body=`Rytojaus naktis nepalanki stebėjimams (${sc.v}/10).`;
+  try{new Notification('Zenitas — rytojaus prognozė',{body,icon:'icon-192.png'});
+    App.settings.lastNotif=key; saveAll();}catch(e){}}
+
+/* ============ NAVIGACIJA / INIT ============ */
+function switchTab(v){
+  document.querySelectorAll('main .view').forEach(s=>s.classList.toggle('act',s.id===v));
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('act',b.dataset.v===v));
+  if(v==='v-tonight')renderTonight();
+  else if(v==='v-cal')renderCal();
+  else if(v==='v-sky'){Sky.start();}
+  else if(v==='v-cat')renderCat();
+  else if(v==='v-log')renderLog();
+  if(v!=='v-sky')Sky.stop&&Sky.stop();}
+document.querySelectorAll('nav.tabs button').forEach(b=>
+  b.addEventListener('click',()=>switchTab(b.dataset.v)));
+
+document.getElementById('setBtn').addEventListener('click',openSettings);
+document.getElementById('locChip').addEventListener('click',openSettings);
+document.getElementById('locChip').addEventListener('keydown',e=>{if(e.key==='Enter')openSettings();});
+document.getElementById('sessGoto').addEventListener('click',()=>switchTab('v-log'));
+document.getElementById('redBtn').addEventListener('click',async()=>{
+  document.documentElement.classList.toggle('red');
+  App.settings.red=document.documentElement.classList.contains('red');
+  await saveAll();
+  toast(App.settings.red?'Naktinis režimas — akys pripras prie tamsos':'Įprastas režimas');});
+document.getElementById('modal').addEventListener('click',e=>{
+  if(e.target.id==='modal')closeModal();});
+
+async function initWeather(force=false){
+  try{ await Weather.load(App.loc.lat,App.loc.lon,force);
+    App.weatherOK=true;
+  }catch(e){ App.weatherOK=false; }
+  const act=document.querySelector('main .view.act');
+  if(act&&act.id==='v-tonight')renderTonight();
+  if(act&&act.id==='v-cal')renderCal();
+  if(App.weatherOK)checkTomorrowNotif();}
+
+(async function init(){
+  const [loc,watch,settings]=await Promise.all([Store.get('loc'),Store.get('watch'),Store.get('settings')]);
+  if(loc)App.loc=loc;
+  if(watch)App.watch=watch;
+  if(settings)App.settings={...App.settings,...settings};
+  if(App.settings.red)document.documentElement.classList.add('red');
+  document.getElementById('locName').textContent=App.loc.name;
+  /* nebaigta sesija po perkrovimo */
+  Journal.load().then(()=>{
+    const open=Journal.sessions.find(s=>!s.end);
+    if(open&&Date.now()-new Date(open.start)<16*3600e3){App.session=open;updateSessBanner();}
+  });
+  renderTonight();
+  initWeather();
+  if('serviceWorker' in navigator&&location.protocol==='https:'){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});}
+})();
+</script>
+</body>
+</html>
