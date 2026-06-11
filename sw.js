@@ -1,6 +1,6 @@
 /* Zenitas service worker — programos apvalkalas veikia be ryšio,
    orai ir žvaigždžių katalogai imami iš tinklo, kai jis yra. */
-const CACHE = 'zenitas-v2';
+const CACHE = 'zenitas-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
