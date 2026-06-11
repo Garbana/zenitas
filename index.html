@@ -131,6 +131,13 @@ nav.tabs button.act{color:var(--gold)}
 #skytime{font-size:.74rem;color:var(--gold);font-family:'Space Grotesk';min-width:84px;text-align:center}
 #skymsg{position:absolute;top:.5rem;left:.5rem;right:.5rem;font-size:.74rem;color:var(--mut);
   background:rgba(7,11,22,.8);border-radius:8px;padding:.3rem .5rem;display:none}
+#skyinfo{position:absolute;top:.5rem;left:.5rem;max-width:75%;display:none;z-index:5;
+  background:rgba(10,16,30,.92);border:1px solid var(--line2);border-radius:12px;padding:.55rem .7rem;
+  box-shadow:0 4px 18px rgba(0,0,0,.45)}
+#skyinfo .t{font-family:'Space Grotesk';font-weight:600;font-size:.92rem;padding-right:1.4rem}
+#skyinfo .s{font-size:.74rem;color:var(--mut);margin-top:2px}
+#skyinfo .b{display:flex;gap:.4rem;margin-top:.5rem}
+#skyinfo .x{position:absolute;top:.3rem;right:.45rem;color:var(--mut);font-size:1rem;padding:.15rem}
 
 /* modal */
 .modal{position:fixed;inset:0;z-index:60;display:none;align-items:flex-end;justify-content:center;
@@ -195,7 +202,9 @@ table.wx td{padding:.32rem .35rem;border-bottom:1px solid var(--line)}
       <div id="skywrap">
         <canvas id="sky"></canvas>
         <div id="skymsg"></div>
+        <div id="skyinfo"></div>
         <div id="skyhud">
+          <button class="btn sm" id="skyAll" title="Visas dangus">⛶</button>
           <button class="btn sm" id="skyNow">Dabar</button>
           <input type="range" id="skySlider" min="-720" max="720" step="10" value="0" aria-label="Laiko poslinkis">
           <span id="skytime">—</span>
@@ -854,11 +863,16 @@ function closeModal(){document.getElementById('modal').classList.remove('act');}
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
 /* ============ ŽVAIGŽDĖLAPIS ============ */
-const Sky={stars:null,lines:null,names:null,offMin:0,zoom:1,rot:0,highlight:null,hits:[],loaded:false,raf:0,
-  start(){ loadSkyData().then(()=>drawSky()); drawSky();
+/* Laisvai valdomas vaizdas: centras (cAz,cAlt) + matymo laukas fov (laipsniais).
+   Stereografinė projekcija aplink žiūrėjimo centrą, kaip Stellarium. */
+const Sky={stars:null,lines:null,names:null,offMin:0,
+  cAz:Math.PI,cAlt:Math.PI/2-0.002,fov:195,  // startas: visas dangaus skliautas nuo zenito
+  sel:null,hits:[],loaded:false,raf:0,
+  start(){ loadSkyData().then(()=>drawSky()); drawSky(); renderSkyInfo();
     clearInterval(this._iv); this._iv=setInterval(()=>{
       if(document.getElementById('v-sky').classList.contains('act'))drawSky();},60000);},
   stop(){ clearInterval(this._iv); this._iv=null; }};
+const FOV_MIN=8, FOV_MAX=200;
 async function loadSkyData(){
   if(Sky.loaded)return;
   const msg=document.getElementById('skymsg');
@@ -872,61 +886,99 @@ async function loadSkyData(){
       fetch(SRC+'constellations.json').then(r=>r.json())]);
     Sky.stars=s.features.map(f=>{const[lo,la]=f.geometry.coordinates;
       return {ra:(lo<0?lo+360:lo)*RAD,dec:la*RAD,mag:f.properties.mag};});
+    Sky.stars.sort((a,b)=>a.mag-b.mag); // nuo ryškiausių — leidžia nutraukti ciklą
     Sky.lines=l.features.map(f=>({id:f.id,seg:f.geometry.coordinates.map(line=>line.map(([lo,la])=>[(lo<0?lo+360:lo)*RAD,la*RAD]))}));
     Sky.names=nm.features.map(f=>{const[lo,la]=f.geometry.coordinates;
       return {id:f.id,ra:(lo<0?lo+360:lo)*RAD,dec:la*RAD};});
     Sky.loaded=true; msg.style.display='none';
-  }catch(e){msg.textContent='Nepavyko atsisiųsti žvaigždžių katalogo (reikia interneto; Claude peržiūroje gali būti blokuojama). Rodomi tik deep sky objektai, planetos ir Mėnulis.';}
+  }catch(e){msg.textContent='Nepavyko atsisiųsti žvaigždžių katalogo (reikia interneto). Rodomi tik deep sky objektai, planetos ir Mėnulis.';}
   drawSky();}
 function skyDate(){return new Date(Date.now()+Sky.offMin*60000);}
-function project(alt,az,W,H,R){
-  if(alt<-0.02)return null;
-  const rho=R*Math.cos(alt)/(1+Math.sin(Math.max(0,alt)));
-  const a=az+Sky.rot;
-  return [W/2+rho*Math.sin(a), H/2-(-rho*Math.cos(a))*-1]; }
+
+/* Ryškio ribos pagal mastelį — atitolinus tik ryškiausios, artinant atsiranda daugiau */
+function starMagLimit(){
+  const lim=7.7-Sky.fov*0.033;
+  return Math.max(2.7,Math.min(App.settings.stars8?8.4:6.6,lim));}
+function dsoMagLimit(){
+  return Sky.fov>120?6.3:Sky.fov>70?8.2:Sky.fov>35?10.5:99;}
+
 function drawSky(){
   const cv=document.getElementById('sky'), wrap=document.getElementById('skywrap');
   const Wc=wrap.clientWidth, Hc=Math.min(Wc, window.innerHeight-230);
   const dpr=window.devicePixelRatio||1;
   cv.width=Wc*dpr; cv.height=Hc*dpr; cv.style.height=Hc+'px';
   const x=cv.getContext('2d'); x.scale(dpr,dpr);
-  const W=Wc,H=Hc, R=Math.min(W,H)/2*0.94*Sky.zoom;
+  const W=Wc,H=Hc;
   const t=skyDate(), lat=App.loc.lat, lon=App.loc.lon;
   document.getElementById('skytime').textContent=t.toLocaleTimeString('lt-LT',{hour:'2-digit',minute:'2-digit'})+(Sky.offMin?` (${Sky.offMin>0?'+':''}${Math.round(Sky.offMin/60*10)/10}h)`:'');
   const sa=sunAlt(t,lat,lon)*DEG;
   x.fillStyle=sa>-6?'#15203A':sa>-12?'#0B1226':sa>-18?'#070C19':'#04060D';
   x.fillRect(0,0,W,H);
+
+  /* projekcija aplink žiūrėjimo centrą */
+  const a0=Sky.cAlt, z0=Sky.cAz;
+  const sinA0=Math.sin(a0), cosA0=Math.cos(a0);
+  const fovR=Sky.fov*RAD;
+  const S=(Math.min(W,H)/2)/(2*Math.tan(fovR/4)); // ekrano pusė = fov/2
+  const maxC=Math.min(Math.PI*0.62,fovR*0.78);    // matomumo kūgis
+  const cosMaxC=Math.cos(maxC);
+  const PA=(alt,az)=>{ // iš horizonto koordinačių
+    const dz=az-z0;
+    const cosc=sinA0*Math.sin(alt)+cosA0*Math.cos(alt)*Math.cos(dz);
+    if(cosc<cosMaxC)return null;
+    const k=2/(1+cosc);
+    const px=k*Math.cos(alt)*Math.sin(dz);
+    const py=k*(cosA0*Math.sin(alt)-sinA0*Math.cos(alt)*Math.cos(dz));
+    return [W/2+px*S, H/2-py*S, alt];};
   const P=(ra,dec)=>{const{alt,az}=altazFromRaDec(ra,dec,t,lat,lon);
-    if(alt<-0.02)return null;
-    const rho=R*Math.cos(alt)/(1+Math.sin(alt));
-    const a=az+Sky.rot;
-    return [W/2+rho*Math.sin(a),H/2-rho*Math.cos(a),alt];};
-  // horizontas
-  x.beginPath();x.arc(W/2,H/2,R,0,TAU);x.strokeStyle='#2A3B61';x.lineWidth=1.5;x.stroke();
-  x.save();x.beginPath();x.arc(W/2,H/2,R+1,0,TAU);x.clip();
-  // aukščio apskritimai 30/60
-  for(const al of [30,60]){const rho=R*Math.cos(al*RAD)/(1+Math.sin(al*RAD));
-    x.beginPath();x.arc(W/2,H/2,rho,0,TAU);x.strokeStyle='rgba(42,59,97,.4)';x.lineWidth=.7;x.stroke();}
-  // žvaigždynų linijos
-  if(Sky.lines){x.strokeStyle='rgba(122,150,205,.34)';x.lineWidth=1;
+    if(alt<-0.55)return null; // giliai po horizontu nerodome
+    return PA(alt,az);};
+  const dimGround=p=>{x.globalAlpha=p[2]<0?0.28:1;};
+
+  /* aukščio apskritimai 30/60 ir horizontas */
+  const ring=(alt,style,wd)=>{x.strokeStyle=style;x.lineWidth=wd;x.beginPath();let st=false;
+    for(let az=0;az<=360;az+=2){const p=PA(alt,az*RAD);
+      if(!p){st=false;continue;} st?x.lineTo(p[0],p[1]):(x.moveTo(p[0],p[1]),st=true);}
+    x.stroke();};
+  ring(30*RAD,'rgba(42,59,97,.4)',.7); ring(60*RAD,'rgba(42,59,97,.4)',.7);
+  ring(0,'#3A5080',1.6);
+  /* kryptys ant horizonto */
+  x.fillStyle='#94A1C3';x.font='12px Space Grotesk';x.textAlign='center';
+  const dirs=[['Š',0],['ŠR',45],['R',90],['PR',135],['P',180],['PV',225],['V',270],['ŠV',315]];
+  for(const[d,az]of dirs){const p=PA(-0.5*RAD,az*RAD);if(p)x.fillText(d,p[0],p[1]+12);}
+  x.textAlign='left';
+
+  /* žvaigždynų linijos — visada, tai orientavimosi karkasas */
+  if(Sky.lines){x.strokeStyle='rgba(122,150,205,.36)';x.lineWidth=1;
     for(const c of Sky.lines)for(const seg of c.seg){let started=false;x.beginPath();
       for(const[ra,dec]of seg){const p=P(ra,dec);
         if(!p){started=false;continue;}
         if(!started){x.moveTo(p[0],p[1]);started=true;}else x.lineTo(p[0],p[1]);}
       x.stroke();}}
-  // ekliptika
+  /* ekliptika */
   x.strokeStyle='rgba(242,200,121,.3)';x.lineWidth=.8;x.beginPath();let st=false;
-  for(let L=0;L<=360;L+=4){const q=eclToEq(L*RAD,0);const p=P(q.ra,q.dec);
+  for(let L=0;L<=360;L+=3){const q=eclToEq(L*RAD,0);const p=P(q.ra,q.dec);
     if(!p){st=false;continue;} if(!st){x.moveTo(p[0],p[1]);st=true;}else x.lineTo(p[0],p[1]);}
   x.stroke();
-  // žvaigždės
-  if(Sky.stars){for(const s of Sky.stars){const p=P(s.ra,s.dec);if(!p)continue;
-    const r=Math.max(.4,(3.4-0.42*s.mag)*Math.sqrt(Sky.zoom));
-    if(r<.45&&s.mag>5.6)continue;
-    x.beginPath();x.arc(p[0],p[1],r,0,TAU);x.fillStyle=s.mag<2?'#F4F6FF':'#C9D4F0';x.fill();}}
+
+  /* žvaigždės — kiekis pagal mastelį (masyvas surikiuotas pagal ryškį) */
+  if(Sky.stars){const lim=starMagLimit();
+    for(const s of Sky.stars){ if(s.mag>lim)break;
+      const p=P(s.ra,s.dec); if(!p)continue;
+      dimGround(p);
+      const r=Math.min(4.3,Math.max(.55,.7+(lim-s.mag)*.5));
+      x.beginPath();x.arc(p[0],p[1],r,0,TAU);
+      x.fillStyle=s.mag<1.6?'#FFFFFF':s.mag<3?'#EDF1FF':'#C2CEEC';x.fill();}
+    x.globalAlpha=1;}
+
   Sky.hits=[];
-  // DSO
-  for(const o of DSO){const p=P(o.ra,o.dec);if(!p)continue;
+  /* DSO — ryškio filtras pagal mastelį; watchlistas ir pasirinktas — visada */
+  const dlim=dsoMagLimit();
+  for(const o of DSO){
+    const inWatch=App.watch.includes(o.id), isSel=Sky.sel&&Sky.sel.kind==='dso'&&Sky.sel.id===o.id;
+    if(o.mag>dlim&&!inWatch&&!isSel)continue;
+    const p=P(o.ra,o.dec);if(!p)continue;
+    dimGround(p);
     const col=o.type==='GX'?'#E08AC0':o.type==='GC'?'#F2C879':(o.type==='OC'||o.type==='AST'||o.type==='SC')?'#8FB8E8':'#7BD9C0';
     x.strokeStyle=col;x.lineWidth=1.2;x.beginPath();
     if(o.type==='GX'){x.ellipse(p[0],p[1],5,2.6,.6,0,TAU);}else
@@ -934,69 +986,132 @@ function drawSky(){
     {x.arc(p[0],p[1],4,0,TAU);}
     x.stroke();
     Sky.hits.push({x:p[0],y:p[1],id:o.id,kind:'dso'});
-    if(o.mag<6.5||Sky.zoom>1.7||App.watch.includes(o.id)){x.fillStyle=col;x.font='10px IBM Plex Sans';
-      x.fillText(o.id,p[0]+6,p[1]-5);}}
-  // planetos
+    if(o.mag<=5.2||Sky.fov<70||inWatch||isSel){x.fillStyle=col;x.font='10px IBM Plex Sans';
+      x.fillText(o.id,p[0]+6,p[1]-5);}
+    x.globalAlpha=1;}
+  /* planetos */
   for(const pl of PLANETS){const c=planetRaDec(pl,t);const p=P(c.ra,c.dec);if(!p)continue;
+    dimGround(p);
     x.fillStyle='#FFE9A8';x.beginPath();x.arc(p[0],p[1],4.5,0,TAU);x.fill();
     x.font='11px Space Grotesk';x.fillText(pl.name,p[0]+7,p[1]+4);
-    Sky.hits.push({x:p[0],y:p[1],id:pl.id,kind:'pl'});}
-  // Mėnulis
+    Sky.hits.push({x:p[0],y:p[1],id:pl.id,kind:'pl'});x.globalAlpha=1;}
+  /* Mėnulis */
   {const md=moonCoords(toDays(t));const p=P(md.ra,md.dec);
-   if(p){const il=moonIllum(t);x.fillStyle='#EDEFF6';x.beginPath();x.arc(p[0],p[1],8,0,TAU);x.fill();
-     x.fillStyle='#04060D';x.font='12px sans-serif';
-     x.fillStyle='#9AA6C8';x.font='11px Space Grotesk';x.fillText('Mėnulis '+Math.round(il.fraction*100)+'%',p[0]+11,p[1]+4);}}
-  // žvaigždynų pavadinimai
-  if(Sky.names){x.fillStyle='rgba(148,161,195,.55)';x.font='10px Space Grotesk';x.textAlign='center';
-    for(const nm of Sky.names){const p=P(nm.ra,nm.dec);if(!p||p[2]<0.07)continue;
+   if(p){dimGround(p);const il=moonIllum(t);
+     x.fillStyle='#EDEFF6';x.beginPath();x.arc(p[0],p[1],8,0,TAU);x.fill();
+     x.fillStyle='#9AA6C8';x.font='11px Space Grotesk';x.fillText('Mėnulis '+Math.round(il.fraction*100)+'%',p[0]+11,p[1]+4);
+     x.globalAlpha=1;}}
+  /* žvaigždynų pavadinimai */
+  if(Sky.names){x.fillStyle='rgba(148,161,195,.55)';x.font=(Sky.fov<60?'11px':'10px')+' Space Grotesk';x.textAlign='center';
+    for(const nm of Sky.names){const p=P(nm.ra,nm.dec);if(!p||p[2]<0.03)continue;
       x.fillText((CONLT[nm.id]||nm.id).toUpperCase(),p[0],p[1]);}
     x.textAlign='left';}
-  // paryškintas objektas
-  if(Sky.highlight){const o=Sky.highlight.kind==='dso'?DSOIDX[Sky.highlight.id]:null;
-    let p=null;
-    if(o)p=P(o.ra,o.dec);
-    else{const pl=PLANETS.find(q=>q.id===Sky.highlight.id);if(pl){const c=planetRaDec(pl,t);p=P(c.ra,c.dec);}}
-    if(p){const ph=(Date.now()/600)%1;
-      x.strokeStyle='var(--gold)';x.strokeStyle='#F2C879';x.lineWidth=2;
+  /* pasirinkto objekto žiedas */
+  if(Sky.sel){let p=null;
+    if(Sky.sel.kind==='dso'){const o=DSOIDX[Sky.sel.id];if(o)p=P(o.ra,o.dec);}
+    else{const pl=PLANETS.find(q=>q.id===Sky.sel.id);if(pl){const c=planetRaDec(pl,t);p=P(c.ra,c.dec);}}
+    if(p){const ph=(Date.now()/700)%1;
+      x.strokeStyle='#F2C879';x.lineWidth=2;
       x.beginPath();x.arc(p[0],p[1],12+ph*6,0,TAU);x.globalAlpha=1-ph*.7;x.stroke();x.globalAlpha=1;
-      cancelAnimationFrame(Sky.raf);Sky.raf=requestAnimationFrame(()=>drawSky());}}
-  x.restore();
-  // kryptys
-  x.fillStyle='#94A1C3';x.font='12px Space Grotesk';x.textAlign='center';
-  const dirs=[['Š',0],['R',90],['P',180],['V',270]];
-  for(const[d,az]of dirs){const a=az*RAD+Sky.rot;
-    x.fillText(d,W/2+(R+12)*Math.sin(a),H/2-(R+12)*Math.cos(a)+4);}
-  x.textAlign='left';}
-function locateObj(id){Sky.highlight={id,kind:'dso'};switchTab('v-sky');
-  const o=DSOIDX[id];const aa=altazFromRaDec(o.ra,o.dec,skyDate(),App.loc.lat,App.loc.lon);
-  if(aa.alt<=0){const n=nightFor(new Date(),0);
+      x.beginPath();x.arc(p[0],p[1],10,0,TAU);x.lineWidth=1.4;x.stroke();
+      cancelAnimationFrame(Sky.raf);Sky.raf=requestAnimationFrame(()=>{
+        if(document.getElementById('v-sky').classList.contains('act'))drawSky();});}}
+}
+
+/* ---- pasirinkimas + info kortelė ---- */
+function skySelect(id,kind){Sky.sel={id,kind};renderSkyInfo();drawSky();}
+function skyDeselect(){Sky.sel=null;renderSkyInfo();drawSky();}
+function renderSkyInfo(){
+  const el=document.getElementById('skyinfo'); if(!el)return;
+  if(!Sky.sel){el.style.display='none';return;}
+  const t=skyDate(); let title='',sub='',pos='',moreFn='';
+  if(Sky.sel.kind==='dso'){const o=DSOIDX[Sky.sel.id]; if(!o){el.style.display='none';return;}
+    title=`${o.id} — ${o.name}`;
+    sub=`${TYPES[o.type]||o.type} · ${CONLT[o.con]||o.con} · ${o.mag}ᵐ · ${o.size}′`;
+    const aa=altazFromRaDec(o.ra,o.dec,t,App.loc.lat,App.loc.lon);
+    if(aa.alt>0)pos=`${Math.round(aa.alt*DEG)}° aukštyje · ${azName(aa.az)}`;
+    else{const f=tt=>altazFromRaDec(o.ra,o.dec,tt,App.loc.lat,App.loc.lon).alt*DEG;
+      const c=crossings(t,new Date(t.getTime()+DAYMS),10,f,0);
+      pos=`po horizontu${c.ups[0]?' · pateka ~'+fmtT(c.ups[0]):''}`;}
+    moreFn=`openObj('${o.id}')`;}
+  else{const p=PLANETS.find(q=>q.id===Sky.sel.id); if(!p){el.style.display='none';return;}
+    const c=planetRaDec(p,t), aa=altazFromRaDec(c.ra,c.dec,t,App.loc.lat,App.loc.lon);
+    title=p.name; sub=`planeta · ${c.mag.toFixed(1)}ᵐ · ${c.dist.toFixed(1)} AV`;
+    pos=aa.alt>0?`${Math.round(aa.alt*DEG)}° aukštyje · ${azName(aa.az)}`:'po horizontu';
+    moreFn=`openPlanet('${p.id}')`;}
+  el.innerHTML=`<button class="x" onclick="skyDeselect()">✕</button>
+    <div class="t">${esc(title)}</div>
+    <div class="s">${esc(sub)}</div>
+    <div class="s" style="color:var(--gold)">${esc(pos)}</div>
+    <div class="b">
+      <button class="btn sm" onclick="skyCenterSel()">⌖ Centruoti</button>
+      <button class="btn sm" onclick="${moreFn}">ℹ Plačiau</button>
+    </div>`;
+  el.style.display='block';}
+function skyCenterSel(zoom){
+  if(!Sky.sel)return; const t=skyDate(); let aa=null;
+  if(Sky.sel.kind==='dso'){const o=DSOIDX[Sky.sel.id];if(o)aa=altazFromRaDec(o.ra,o.dec,t,App.loc.lat,App.loc.lon);}
+  else{const p=PLANETS.find(q=>q.id===Sky.sel.id);
+    if(p){const c=planetRaDec(p,t);aa=altazFromRaDec(c.ra,c.dec,t,App.loc.lat,App.loc.lon);}}
+  if(!aa)return;
+  Sky.cAz=aa.az; Sky.cAlt=Math.max(-25*RAD,Math.min(89.7*RAD,aa.alt));
+  if(zoom!==false)Sky.fov=Math.min(Sky.fov,38);
+  drawSky();}
+
+/* „Rodyti danguje" — perkelia tiesiai prie objekto, prizoomina, parodo kortelę */
+function locateObj(id){
+  closeModal(); switchTab('v-sky');
+  Sky.sel={id,kind:'dso'}; Sky.fov=36;
+  const o=DSOIDX[id];
+  const aa=altazFromRaDec(o.ra,o.dec,skyDate(),App.loc.lat,App.loc.lon);
+  if(aa.alt*DEG<-25){ // giliai po horizontu — rodome jo azimutą prie horizonto
+    Sky.cAz=aa.az; Sky.cAlt=-8*RAD;
     const f=t=>altazFromRaDec(o.ra,o.dec,t,App.loc.lat,App.loc.lon).alt*DEG;
     const c=crossings(new Date(),new Date(Date.now()+DAYMS),10,f,0);
-    toast(`${o.id} dabar po horizontu${c.ups[0]?', pateka ~'+fmtT(c.ups[0]):''}`);}
-  else toast(`${o.id}: ${Math.round(aa.alt*DEG)}° aukštyje, azimutas ${Math.round(aa.az*DEG)}° (${azName(aa.az)})`);
-  closeModal();drawSky();}
-function locatePlanet(id){Sky.highlight={id,kind:'pl'};switchTab('v-sky');closeModal();drawSky();}
-function azName(az){const d=az*DEG;const n=['Š','ŠR','R','PR','P','PV','V','ŠV'];return n[Math.round(d/45)%8];}
-/* lietimas */
+    toast(`${o.id} dabar giliai po horizontu${c.ups[0]?' — pateka ~'+fmtT(c.ups[0]):''}`);
+  } else { Sky.cAz=aa.az; Sky.cAlt=Math.max(-25*RAD,Math.min(89.7*RAD,aa.alt)); }
+  renderSkyInfo(); drawSky();}
+function locatePlanet(id){
+  closeModal(); switchTab('v-sky');
+  Sky.sel={id,kind:'pl'}; Sky.fov=36;
+  const p=PLANETS.find(q=>q.id===id);
+  const c=planetRaDec(p,skyDate());
+  const aa=altazFromRaDec(c.ra,c.dec,skyDate(),App.loc.lat,App.loc.lon);
+  Sky.cAz=aa.az; Sky.cAlt=Math.max(-25*RAD,Math.min(89.7*RAD,aa.alt));
+  if(aa.alt<=0)toast(`${p.name} dabar po horizontu`);
+  renderSkyInfo(); drawSky();}
+function azName(az){const d=((az*DEG)%360+360)%360;const n=['Š','ŠR','R','PR','P','PV','V','ŠV'];return n[Math.round(d/45)%8];}
+
+/* ---- lietimas: stumdymas, mastelis, bakstelėjimas ---- */
 (()=>{const cv=document.getElementById('sky');let drag=null,pinch=null,moved=false;
+  const clampAlt=a=>Math.max(-28*RAD,Math.min(89.7*RAD,a));
   cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);
-    if(drag&&drag.id!==e.pointerId){pinch={a:drag,b:{id:e.pointerId,x:e.offsetX,y:e.offsetY},z:Sky.zoom};}
-    else drag={id:e.pointerId,x:e.offsetX,y:e.offsetY,rot:Sky.rot};moved=false;});
+    if(drag&&drag.id!==e.pointerId){pinch={a:drag,b:{id:e.pointerId,x:e.offsetX,y:e.offsetY},f:Sky.fov};}
+    else drag={id:e.pointerId,x:e.offsetX,y:e.offsetY,az:Sky.cAz,alt:Sky.cAlt};moved=false;});
   cv.addEventListener('pointermove',e=>{
     if(pinch){const p=e.pointerId===pinch.a.id?pinch.a:pinch.b;p.x=e.offsetX;p.y=e.offsetY;
       const d=Math.hypot(pinch.a.x-pinch.b.x,pinch.a.y-pinch.b.y);
-      if(!pinch.d0)pinch.d0=d;else{Sky.zoom=Math.max(.7,Math.min(4,pinch.z*d/pinch.d0));drawSky();}moved=true;return;}
-    if(drag&&e.pointerId===drag.id){const dx=e.offsetX-drag.x;
-      if(Math.abs(dx)>4)moved=true;
-      Sky.rot=drag.rot+dx*0.006;drawSky();}});
-  const up=e=>{if(!moved&&drag){const mx=e.offsetX,my=e.offsetY;let best=null,bd=20*20;
+      if(!pinch.d0)pinch.d0=d;else{Sky.fov=Math.max(FOV_MIN,Math.min(FOV_MAX,pinch.f*pinch.d0/d));drawSky();}moved=true;return;}
+    if(drag&&e.pointerId===drag.id){
+      const dx=e.offsetX-drag.x, dy=e.offsetY-drag.y;
+      if(Math.abs(dx)+Math.abs(dy)>5)moved=true;
+      const H=cv.clientHeight||1;
+      const k=(Sky.fov*RAD)/H;                       // rad per pikselį
+      const cd=Math.max(0.25,Math.cos(Sky.cAlt));    // az greitėja arti zenito
+      Sky.cAz=drag.az-dx*k/cd;
+      Sky.cAlt=clampAlt(drag.alt+dy*k);
+      drawSky();}});
+  const up=e=>{if(!moved&&drag){const mx=e.offsetX,my=e.offsetY;let best=null,bd=22*22;
       for(const h of Sky.hits){const d=(h.x-mx)**2+(h.y-my)**2;if(d<bd){bd=d;best=h;}}
-      if(best){best.kind==='dso'?openObj(best.id):openPlanet(best.id);}}
+      if(best)skySelect(best.id,best.kind); else skyDeselect();}
     drag=null;pinch=null;};
   cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',()=>{drag=null;pinch=null;});
-  cv.addEventListener('wheel',e=>{e.preventDefault();Sky.zoom=Math.max(.7,Math.min(4,Sky.zoom*(e.deltaY<0?1.12:0.89)));drawSky();},{passive:false});
-  document.getElementById('skySlider').addEventListener('input',e=>{Sky.offMin=+e.target.value;drawSky();});
-  document.getElementById('skyNow').addEventListener('click',()=>{Sky.offMin=0;document.getElementById('skySlider').value=0;drawSky();});
+  cv.addEventListener('wheel',e=>{e.preventDefault();
+    Sky.fov=Math.max(FOV_MIN,Math.min(FOV_MAX,Sky.fov*(e.deltaY<0?0.88:1.14)));drawSky();},{passive:false});
+  document.getElementById('skySlider').addEventListener('input',e=>{Sky.offMin=+e.target.value;drawSky();renderSkyInfo();});
+  document.getElementById('skyNow').addEventListener('click',()=>{Sky.offMin=0;document.getElementById('skySlider').value=0;drawSky();renderSkyInfo();});
+  document.getElementById('skyAll').addEventListener('click',()=>{
+    Sky.cAz=Math.PI;Sky.cAlt=Math.PI/2-0.002;Sky.fov=195;drawSky();});
   window.addEventListener('resize',()=>{if(document.getElementById('v-sky').classList.contains('act'))drawSky();});
 })();
 
